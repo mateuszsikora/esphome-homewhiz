@@ -1,0 +1,71 @@
+# Generic HomeWhiz -> ESPHome bridge (any BLE appliance, not washer-specific).
+#
+# The appliance semantics come entirely from generated artifacts:
+#   - components/homewhiz/mapping.h   (decode table)
+#   - homewhiz_entities.yaml          (one entity per discovered field)
+# Regenerate both with provisioning/ and this same yaml serves any HomeWhiz
+# appliance — no edits here. See README.
+#
+# Pinned ESPHome: 2025.3.1 (esp-idf).
+
+esphome:
+  name: homewhiz-bridge
+
+esp32:
+  board: esp32dev
+  framework:
+    type: esp-idf
+
+logger:
+  level: DEBUG  # DEBUG shows the ble_client GATT dump + [scan] lines
+
+api:
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  # Optional static IP. Recommended when Home Assistant / your dev machine is on
+  # a different VLAN than the ESP, because mDNS (used to resolve `.local`) does
+  # not cross VLAN boundaries. Define these in secrets.yaml, or delete this whole
+  # `manual_ip` block to use DHCP.
+  manual_ip:
+    static_ip: !secret static_ip
+    gateway: !secret gateway
+    subnet: !secret subnet
+    dns1: !secret gateway
+
+external_components:
+  - source:
+      type: local
+      path: components
+
+# BLE scanner. Logs nearby device MAC + name at INFO under [scan] ONLY while not
+# connected to the appliance — so with appliance_mac unset/wrong you get the
+# nearby MACs to pick from, and once the correct MAC connects the scan goes
+# quiet automatically. HomeWhiz appliances advertise a name starting "HwZ_".
+esp32_ble_tracker:
+  scan_parameters:
+    active: true
+  on_ble_advertise:
+    - then:
+        - lambda: |-
+            if (id(appliance)->is_connected()) return;
+            ESP_LOGI("scan", "Nearby BLE  %s  RSSI=%d  name='%s'",
+                     x.address_str().c_str(), x.get_rssi(), x.get_name().c_str());
+
+ble_client:
+  - mac_address: !secret appliance_mac
+    id: appliance_ble
+
+homewhiz:
+  - id: appliance
+    ble_client_id: appliance_ble
+    # Confirmed on a live Beko EWUE7636XAW (AC01/AC02 live here). If yours
+    # differs, find it in the ble_client GATT dump (plan §3.1 / T-B2).
+    service_uuid: "0000ac00-0000-1000-8000-00805f9b34fb"
+
+# Entities are generated (numeric/progress -> sensor, enum/flag -> text_sensor).
+packages:
+  entities: !include homewhiz_entities.yaml

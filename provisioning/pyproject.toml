@@ -1,0 +1,24 @@
+[project]
+name = "homewhiz-provisioning"
+version = "0.1.0"
+description = "One-time HomeWhiz provisioning: fetch appliance config and generate an ESPHome mapping.h"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "aiohttp>=3.9",
+    "dacite>=1.8",
+    "python-dotenv>=1.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]
+
+# The vendored upstream package lives in ./vendor and is imported as `vendor.*`.
+# Scripts are run from the provisioning/ directory (e.g. `uv run python fetch_config.py`).
+[tool.setuptools]
+py-modules = ["fetch_config", "generate_mapping"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

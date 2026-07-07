@@ -1,0 +1,36 @@
+# optional provisioning debug dumps (--dump-config / --dump-localization)
+config.json
+localization.json
+
+# generated mapping (regenerate with provisioning; lives in the component dir
+# so ESPHome's external_components copies it)
+esphome/components/homewhiz/mapping.h
+esphome/mapping.h
+
+# secrets — never commit
+secrets.yaml
+.env
+*.env
+
+# python
+__pycache__/
+*.pyc
+.venv/
+.uv/
+.pytest_cache/
+*.egg-info/
+
+# esphome build
+esphome/.esphome/
+esphome/.pioenvs/
+esphome/.piolibdeps/
+
+# build/test scratch
+build/
+tests/build/
+*.o
+*.out
+.context/
+
+# generated entity include (regenerate with provisioning)
+esphome/homewhiz_entities.yaml
