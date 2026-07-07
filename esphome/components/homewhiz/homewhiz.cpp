@@ -20,24 +20,37 @@ void HomeWhiz::dump_config() {
   ESP_LOGCONFIG(TAG, "  Service UUID: %s", this->service_uuid_raw_.c_str());
   ESP_LOGCONFIG(TAG, "  Mapping: %u fields, %u write targets", (unsigned) HW_FIELD_COUNT,
                 (unsigned) HW_WRITE_COUNT);
+  // Log each registered key and check it exists with a compatible kind for the
+  // platform it's wired to (sensor<-numeric/progress, text_sensor<-enum,
+  // binary_sensor<-flag). Mismatches would silently never publish otherwise.
+  auto check = [](const char *platform, const std::string &key, bool ok_kind) {
+    const FieldDesc *d = hw_find_field(key.c_str());
+    if (d == nullptr)
+      ESP_LOGE(TAG, "  %s key '%s' not found in mapping.h", platform, key.c_str());
+    else if (!ok_kind)
+      ESP_LOGE(TAG, "  %s key '%s' has incompatible kind %u for this platform",
+               platform, key.c_str(), (unsigned) d->kind);
+    else
+      ESP_LOGCONFIG(TAG, "  %s key: %s", platform, key.c_str());
+  };
 #ifdef USE_SENSOR
-  for (auto &kv : this->sensors_)
-    ESP_LOGCONFIG(TAG, "  Sensor key: %s", kv.first.c_str());
+  for (auto &kv : this->sensors_) {
+    const FieldDesc *d = hw_find_field(kv.first.c_str());
+    check("Sensor", kv.first,
+          d != nullptr && (d->kind == KIND_NUMERIC || d->kind == KIND_PROGRESS));
+  }
 #endif
 #ifdef USE_TEXT_SENSOR
-  for (auto &kv : this->text_sensors_)
-    ESP_LOGCONFIG(TAG, "  Text sensor key: %s", kv.first.c_str());
+  for (auto &kv : this->text_sensors_) {
+    const FieldDesc *d = hw_find_field(kv.first.c_str());
+    check("Text sensor", kv.first, d != nullptr && d->kind == KIND_ENUM);
+  }
 #endif
-  // Warn early about keys that don't exist in the generated table.
-#ifdef USE_SENSOR
-  for (auto &kv : this->sensors_)
-    if (hw_find_field(kv.first.c_str()) == nullptr)
-      ESP_LOGE(TAG, "  Sensor key '%s' not found in mapping.h", kv.first.c_str());
-#endif
-#ifdef USE_TEXT_SENSOR
-  for (auto &kv : this->text_sensors_)
-    if (hw_find_field(kv.first.c_str()) == nullptr)
-      ESP_LOGE(TAG, "  Text sensor key '%s' not found in mapping.h", kv.first.c_str());
+#ifdef USE_BINARY_SENSOR
+  for (auto &kv : this->binary_sensors_) {
+    const FieldDesc *d = hw_find_field(kv.first.c_str());
+    check("Binary sensor", kv.first, d != nullptr && d->kind == KIND_FLAG);
+  }
 #endif
 }
 
@@ -125,6 +138,8 @@ void HomeWhiz::gattc_event_handler(esp_gattc_cb_event_t event,
       this->handshaken_ = false;
       this->notify_handle_ = 0;
       this->write_handle_ = 0;
+      // Drop any half-received frame so it can't bridge across the reconnect.
+      this->accumulator_.reset();
       break;
     }
     default:
@@ -150,6 +165,15 @@ void HomeWhiz::handle_frame_(const uint8_t *frame, size_t len) {
       continue;
     if (hw_decode(*d, frame, len, v) && v.type == DECODED_TEXT)
       kv.second->publish_state(v.text);
+  }
+#endif
+#ifdef USE_BINARY_SENSOR
+  for (auto &kv : this->binary_sensors_) {
+    const FieldDesc *d = hw_find_field(kv.first.c_str());
+    if (d == nullptr)
+      continue;
+    if (hw_decode(*d, frame, len, v) && v.type == DECODED_BOOL)
+      kv.second->publish_state(v.boolean);
   }
 #endif
 }

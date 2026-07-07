@@ -162,10 +162,16 @@ async def _run(args: argparse.Namespace) -> None:
     language = args.language or os.environ.get("HOMEWHIZ_LANGUAGE") or "en-GB"
 
     print("Logging in…", file=sys.stderr)
-    credentials = await api.login(username, password)
+    try:
+        credentials = await api.login(username, password)
+    except api.LoginError:
+        sys.exit("Login failed — check HOMEWHIZ_USER / HOMEWHIZ_PASS.")
 
     print("Fetching appliances…", file=sys.stderr)
-    appliances = await api.fetch_appliance_infos(credentials)
+    try:
+        appliances = await api.fetch_appliance_infos(credentials)
+    except api.RequestError as e:
+        sys.exit(f"Failed to fetch appliances from HomeWhiz: {e}")
     if not appliances:
         sys.exit("No appliances found on this account.")
     _print_appliances(appliances)
@@ -188,9 +194,12 @@ async def _run(args: argparse.Namespace) -> None:
             file=sys.stderr,
         )
 
-    contents = await api.fetch_appliance_contents(
-        credentials, target.applianceId, language=language
-    )
+    try:
+        contents = await api.fetch_appliance_contents(
+            credentials, target.applianceId, language=language
+        )
+    except api.RequestError as e:
+        sys.exit(f"Failed to fetch appliance config: {e}")
 
     config_dict = dataclasses.asdict(contents.config)
     # Attach provenance so the generator can stamp the header (no secrets here).

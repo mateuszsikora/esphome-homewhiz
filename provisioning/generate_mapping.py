@@ -54,6 +54,7 @@ class Field:
     enums: list[EnumEntry] = field(default_factory=list)
     label: str | None = None
     unit: str | None = None
+    diagnostic: bool = False  # -> Home Assistant entity_category: diagnostic
 
 
 @dataclass
@@ -78,7 +79,12 @@ class Walker:
 
     def _add(self, f: Field) -> None:
         if f.key in self._seen:
-            return  # first definition wins; keeps the table deterministic
+            # first definition wins; keeps the table deterministic
+            print(
+                f"warning: duplicate strKey {f.key!r} — keeping the first definition",
+                file=sys.stderr,
+            )
+            return
         self._seen.add(f.key)
         f.label = self._label(f.key)
         self.fields.append(f)
@@ -102,7 +108,7 @@ class Walker:
         if sub is None:
             return
         enums = [EnumEntry(o.wifiArrayValue, o.strKey) for o in sub.subStates]
-        self._add(Field(key, KIND_ENUM, sub.wifiArrayReadIndex, enums=enums))
+        self._add(Field(key, KIND_ENUM, sub.wifiArrayReadIndex, enums=enums, diagnostic=True))
 
     def add_program(self, program) -> None:  # ApplianceProgram
         if program is None:
@@ -111,13 +117,20 @@ class Walker:
         self._add(Field(program.strKey, KIND_ENUM, program.wifiArrayIndex, enums=enums))
         self._add_write(program.strKey, program.wfaWriteIndex)
 
-    def add_features(self, features: list[ApplianceFeature] | None) -> None:
+    def add_features(
+        self, features: list[ApplianceFeature] | None, *, diagnostic: bool = False
+    ) -> None:
         for feat in features or []:
             if feat.strKey is None:
                 continue
             if feat.enumValues:
                 enums = [EnumEntry(o.wifiArrayValue, o.strKey) for o in feat.enumValues]
-                self._add(Field(feat.strKey, KIND_ENUM, feat.wifiArrayIndex, enums=enums))
+                self._add(
+                    Field(
+                        feat.strKey, KIND_ENUM, feat.wifiArrayIndex,
+                        enums=enums, diagnostic=diagnostic,
+                    )
+                )
             elif feat.boundedValues:
                 bounds = feat.boundedValues[0]
                 self._add(
@@ -127,6 +140,7 @@ class Walker:
                         feat.wifiArrayIndex,
                         factor=bounds.factor,
                         unit=bounds.unit,
+                        diagnostic=diagnostic,
                     )
                 )
             else:
@@ -158,19 +172,24 @@ class Walker:
             return
         for opt in warning.warnings:
             self._add(
-                Field(opt.strKey, KIND_FLAG, warning.wifiArrayReadIndex, index2=opt.bitIndex)
+                Field(
+                    opt.strKey, KIND_FLAG, warning.wifiArrayReadIndex,
+                    index2=opt.bitIndex, diagnostic=True,
+                )
             )
 
     def walk(self, config: ApplianceConfiguration) -> None:
+        # Primary controls: state, program, program options, remaining/delay time.
         self.add_state("STATE", config.deviceStates)
-        self.add_substate("SUBSTATE", config.deviceSubStates)
         self.add_program(config.program)
         self.add_features(config.subPrograms)
-        self.add_features(config.customSubPrograms)
-        self.add_features(config.monitorings)
-        self.add_features(config.settings)
-        self.add_features(config.commands)
         self.add_progress(config.progressVariables)
+        # Diagnostic: sub-state, settings, monitorings, custom/commands, warnings.
+        self.add_substate("SUBSTATE", config.deviceSubStates)
+        self.add_features(config.customSubPrograms, diagnostic=True)
+        self.add_features(config.monitorings, diagnostic=True)
+        self.add_features(config.settings, diagnostic=True)
+        self.add_features(config.commands, diagnostic=True)
         self.add_warnings(config.warnings)
         self.add_warnings(config.deviceWarnings)
         self.add_warnings(config.deviceWarningsExtra)
@@ -300,12 +319,15 @@ def _prettify(key: str) -> str:
 def emit_entities(walker: Walker, hub_id: str = "appliance") -> str:
     """One ESPHome entity per decodable field — the generic entity set.
 
-    numeric/progress -> sensor, enum/flag -> text_sensor. Include it from a
-    device-agnostic bridge yaml via `packages`, so any appliance is just
-    "regenerate + include", no hand-wiring (plan §6-T-B3).
+    numeric/progress -> sensor, enum -> text_sensor, flag -> binary_sensor, with
+    Home Assistant semantics attached (device_class / state_class /
+    entity_category). Pull into a device-agnostic bridge yaml via `packages`, so
+    any appliance is just "regenerate + include", no hand-wiring (plan §6-T-B3).
     """
     sensors: list[str] = []
     text_sensors: list[str] = []
+    binary_sensors: list[str] = []
+
     for f in walker.fields:
         name = f.label or _prettify(f.key)
         entry = [
@@ -314,12 +336,23 @@ def emit_entities(walker: Walker, hub_id: str = "appliance") -> str:
             f"    key: {f.key}",
             f'    name: "{name}"',
         ]
-        if f.kind in (KIND_NUMERIC, KIND_PROGRESS):
-            unit = "min" if f.kind == KIND_PROGRESS else f.unit
-            if unit:
-                entry.append(f'    unit_of_measurement: "{unit}"')
+        if f.diagnostic:
+            entry.append("    entity_category: diagnostic")
+
+        if f.kind == KIND_PROGRESS:
+            entry.append('    unit_of_measurement: "min"')
+            entry.append("    device_class: duration")
+            entry.append("    state_class: measurement")
             sensors.append("\n".join(entry))
-        else:  # enum / flag
+        elif f.kind == KIND_NUMERIC:
+            if f.unit:
+                entry.append(f'    unit_of_measurement: "{f.unit}"')
+            entry.append("    state_class: measurement")
+            sensors.append("\n".join(entry))
+        elif f.kind == KIND_FLAG:
+            entry.append("    device_class: problem")
+            binary_sensors.append("\n".join(entry))
+        else:  # KIND_ENUM
             text_sensors.append("\n".join(entry))
 
     out = [
@@ -329,14 +362,15 @@ def emit_entities(walker: Walker, hub_id: str = "appliance") -> str:
         "#     entities: !include homewhiz_entities.yaml",
         "",
     ]
-    if text_sensors:
-        out.append("text_sensor:")
-        out.extend(text_sensors)
-        out.append("")
-    if sensors:
-        out.append("sensor:")
-        out.extend(sensors)
-        out.append("")
+    for header, block in (
+        ("text_sensor:", text_sensors),
+        ("sensor:", sensors),
+        ("binary_sensor:", binary_sensors),
+    ):
+        if block:
+            out.append(header)
+            out.extend(block)
+            out.append("")
     return "\n".join(out)
 
 

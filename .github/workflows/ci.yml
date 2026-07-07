@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install provisioning deps
+        run: pip install aiohttp dacite python-dotenv pytest
+
+      - name: Provisioning tests
+        working-directory: provisioning
+        run: python -m pytest -q
+
+      - name: Host decode test (C++)
+        run: bash tests/run.sh
+
+      - name: ESPHome config check
+        run: |
+          pip install esphome
+          # Generate the artifacts from the public washer fixture (no credentials).
+          python provisioning/generate_mapping.py \
+            provisioning/tests/fixtures/example_washing_machine_config.json \
+            --out esphome/components/homewhiz/mapping.h \
+            --entities-out esphome/homewhiz_entities.yaml
+          cp esphome/secrets.yaml.example esphome/secrets.yaml
+          esphome config esphome/bridge.yaml

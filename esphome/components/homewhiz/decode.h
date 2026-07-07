@@ -9,6 +9,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <cstring>
 
 #include "mapping.h"
@@ -23,12 +24,19 @@ inline uint8_t hw_value(const uint8_t *data, size_t len, uint8_t index) {
   return data[index] & 0x7F;
 }
 
-enum DecodedType : uint8_t { DECODED_NONE = 0, DECODED_TEXT, DECODED_NUMBER };
+enum DecodedType : uint8_t {
+  DECODED_NONE = 0,
+  DECODED_TEXT,
+  DECODED_NUMBER,
+  DECODED_BOOL,
+};
 
 struct DecodedField {
   DecodedType type = DECODED_NONE;
-  float number = 0.0f;      // valid when type == DECODED_NUMBER
-  const char *text = nullptr;  // valid when type == DECODED_TEXT (enum key / flag)
+  float number = 0.0f;         // valid when type == DECODED_NUMBER
+  const char *text = nullptr;  // valid when type == DECODED_TEXT (enum key)
+  bool boolean = false;        // valid when type == DECODED_BOOL (flag)
+  char textbuf[12] = {0};      // scratch for numeric-fallback enum text
 };
 
 // Decode a single field descriptor against a reassembled frame.
@@ -46,7 +54,12 @@ inline bool hw_decode(const FieldDesc &d, const uint8_t *data, size_t len,
           return true;
         }
       }
-      return false;  // unknown enum value for this frame
+      // Unknown value: some fields (e.g. spin) are really numeric with only a
+      // few enumerated landmarks. Publish the raw value instead of going stale.
+      std::snprintf(out.textbuf, sizeof(out.textbuf), "%u", (unsigned) v);
+      out.type = DECODED_TEXT;
+      out.text = out.textbuf;
+      return true;
     }
     case KIND_NUMERIC: {
       out.type = DECODED_NUMBER;
@@ -63,8 +76,8 @@ inline bool hw_decode(const FieldDesc &d, const uint8_t *data, size_t len,
       // Warning/flag bits are read from the RAW byte (upstream
       // BooleanBitmaskControl), not the & 0x7F value.
       uint8_t raw = d.index < len ? data[d.index] : 0;
-      out.type = DECODED_TEXT;
-      out.text = ((raw >> d.index2) & 0x01) ? "on" : "off";
+      out.type = DECODED_BOOL;
+      out.boolean = ((raw >> d.index2) & 0x01) != 0;
       return true;
     }
   }
@@ -120,6 +133,12 @@ class MessageAccumulator {
     expected_ = 0;
     buf_len_ = 0;
     return nullptr;
+  }
+
+  // Discard any partially-accumulated frame (e.g. on disconnect).
+  void reset() {
+    expected_ = 0;
+    buf_len_ = 0;
   }
 
  private:

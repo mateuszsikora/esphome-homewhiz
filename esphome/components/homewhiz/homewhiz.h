@@ -14,6 +14,9 @@
 #ifdef USE_TEXT_SENSOR
 #include "esphome/components/text_sensor/text_sensor.h"
 #endif
+#ifdef USE_BINARY_SENSOR
+#include "esphome/components/binary_sensor/binary_sensor.h"
+#endif
 
 #include "decode.h"
 
@@ -53,6 +56,11 @@ class HomeWhiz : public ble_client::BLEClientNode, public Component {
     this->text_sensors_.push_back({key, s});
   }
 #endif
+#ifdef USE_BINARY_SENSOR
+  void register_binary_sensor(const std::string &key, binary_sensor::BinarySensor *s) {
+    this->binary_sensors_.push_back({key, s});
+  }
+#endif
 
   // Stretch goal (plan §3.6 / T-B4): write value V to appliance index I. Guarded
   // — only call from an explicit user action.
@@ -84,6 +92,9 @@ class HomeWhiz : public ble_client::BLEClientNode, public Component {
 #endif
 #ifdef USE_TEXT_SENSOR
   std::vector<std::pair<std::string, text_sensor::TextSensor *>> text_sensors_;
+#endif
+#ifdef USE_BINARY_SENSOR
+  std::vector<std::pair<std::string, binary_sensor::BinarySensor *>> binary_sensors_;
 #endif
 };
 

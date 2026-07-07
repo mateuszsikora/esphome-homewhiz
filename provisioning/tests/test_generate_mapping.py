@@ -108,12 +108,18 @@ def _entities(fixture_name: str) -> str:
 
 def test_washer_entities_classification():
     y = _entities("example_washing_machine_config.json")
-    assert "text_sensor:" in y and "sensor:" in y
+    assert "text_sensor:" in y and "sensor:" in y and "binary_sensor:" in y
     # enum -> text_sensor
     assert "key: STATE" in y
-    # progress -> sensor with minutes unit
+    # progress -> sensor with HA duration semantics
     assert "key: WASHER_REMAINING" in y
     assert 'unit_of_measurement: "min"' in y
+    assert "device_class: duration" in y
+    assert "state_class: measurement" in y
+    # flags -> binary_sensor with device_class: problem
+    assert "device_class: problem" in y
+    # settings/warnings are diagnostic
+    assert "entity_category: diagnostic" in y
     # every entity is wired to the generic hub id
     assert "homewhiz_id: appliance" in y
 
