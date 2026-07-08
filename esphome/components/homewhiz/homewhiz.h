@@ -47,8 +47,10 @@ class HomeWhiz : public ble_client::BLEClientNode, public Component {
   bool is_connected() const { return this->handshaken_; }
 
 #ifdef USE_SENSOR
-  void register_sensor(const std::string &key, sensor::Sensor *s) {
-    this->sensors_.push_back({key, s});
+  // factor > 0 forces a numeric reading (raw byte & 0x7F) * factor, even when the
+  // field is modelled as an enum (e.g. spin: byte 12 -> 1200 rpm with factor 100).
+  void register_sensor(const std::string &key, sensor::Sensor *s, float factor = 0.0f) {
+    this->sensors_.push_back({key, s, factor});
   }
 #endif
 #ifdef USE_TEXT_SENSOR
@@ -88,7 +90,12 @@ class HomeWhiz : public ble_client::BLEClientNode, public Component {
   MessageAccumulator accumulator_;
 
 #ifdef USE_SENSOR
-  std::vector<std::pair<std::string, sensor::Sensor *>> sensors_;
+  struct SensorEntry {
+    std::string key;
+    sensor::Sensor *sensor;
+    float factor;  // 0 = decode by field kind; >0 = force numeric raw*factor
+  };
+  std::vector<SensorEntry> sensors_;
 #endif
 #ifdef USE_TEXT_SENSOR
   std::vector<std::pair<std::string, text_sensor::TextSensor *>> text_sensors_;

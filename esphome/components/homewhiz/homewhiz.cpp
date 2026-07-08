@@ -34,10 +34,12 @@ void HomeWhiz::dump_config() {
       ESP_LOGCONFIG(TAG, "  %s key: %s", platform, key.c_str());
   };
 #ifdef USE_SENSOR
-  for (auto &kv : this->sensors_) {
-    const FieldDesc *d = hw_find_field(kv.first.c_str());
-    check("Sensor", kv.first,
-          d != nullptr && (d->kind == KIND_NUMERIC || d->kind == KIND_PROGRESS));
+  for (auto &e : this->sensors_) {
+    const FieldDesc *d = hw_find_field(e.key.c_str());
+    // A factor override makes any field numeric, so enum is fine in that case.
+    check("Sensor", e.key,
+          d != nullptr && (e.factor > 0.0f || d->kind == KIND_NUMERIC ||
+                           d->kind == KIND_PROGRESS));
   }
 #endif
 #ifdef USE_TEXT_SENSOR
@@ -150,12 +152,16 @@ void HomeWhiz::gattc_event_handler(esp_gattc_cb_event_t event,
 void HomeWhiz::handle_frame_(const uint8_t *frame, size_t len) {
   DecodedField v;
 #ifdef USE_SENSOR
-  for (auto &kv : this->sensors_) {
-    const FieldDesc *d = hw_find_field(kv.first.c_str());
+  for (auto &e : this->sensors_) {
+    const FieldDesc *d = hw_find_field(e.key.c_str());
     if (d == nullptr)
       continue;
-    if (hw_decode(*d, frame, len, v) && v.type == DECODED_NUMBER)
-      kv.second->publish_state(v.number);
+    if (e.factor > 0.0f) {
+      // Forced numeric: raw value * factor (e.g. enum-modelled spin -> rpm).
+      e.sensor->publish_state(hw_value(frame, len, d->index) * e.factor);
+    } else if (hw_decode(*d, frame, len, v) && v.type == DECODED_NUMBER) {
+      e.sensor->publish_state(v.number);
+    }
   }
 #endif
 #ifdef USE_TEXT_SENSOR

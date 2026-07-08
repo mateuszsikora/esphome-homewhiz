@@ -157,19 +157,33 @@ those names — the decode logic is unchanged.
 
 ## Known limitations
 
-- **Spin/temperature are sparse enums, not raw numbers.** For the reference
-  washer the config models `WASHER_SPIN` as an enum of `{no_spin, rinse_hold}`
-  only, so an actual spin value (e.g. 1200 rpm) decodes as *unknown* rather than
-  a number. Exposing those as numeric sensors would need an explicit override.
+- **Spin/temperature are sparse enums, not raw numbers.** Some fields (notably
+  `WASHER_SPIN`) are modelled in the config as an enum with only a few landmark
+  values (`no_spin`, `rinse_hold`), even though the byte is really numeric. For
+  an unrecognised value the text_sensor falls back to publishing the raw number
+  (e.g. `"12"`) rather than going stale. To expose it as a proper numeric sensor,
+  add a `sensor` for the same key with a `factor` — the reading becomes
+  `(raw byte) * factor`:
+
+  ```yaml
+  sensor:
+    - platform: homewhiz
+      homewhiz_id: appliance
+      key: WASHER_SPIN
+      name: "Spin speed"
+      factor: 100          # byte 12 -> 1200 rpm
+      unit_of_measurement: rpm
+  ```
 - **Write path (start/pause) is a stretch goal.** `program.wfaWriteIndex` is null
   in every known appliance config; the writable target is the device-state index
   (`deviceStates.wifiArrayWriteIndex`, 34 on the washer). `send_command` is
   scaffolded but not wired to entities by default — validate carefully on device.
-- **One appliance per ESP (recommended).** The component decodes against a single
+- **One appliance per ESP (by design).** The component decodes against a single
   generated table, and appliances in different rooms are out of one ESP's BLE
-  range anyway. Run one ESP per appliance.
-- **Air conditioners** map onto Home Assistant's `climate` domain rather than
-  `sensor`/`text_sensor`; not covered by the generic entity set.
+  range anyway — so one ESP per appliance is the intended model, not a bug.
+- **Air conditioners (roadmap).** AC units map onto Home Assistant's `climate`
+  domain rather than `sensor`/`text_sensor`, so they aren't covered by the generic
+  entity set yet. A `climate` platform would be a natural follow-up.
 
 ## Development
 
