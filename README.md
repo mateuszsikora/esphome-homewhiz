@@ -147,6 +147,46 @@ static IP so OTA and log streaming reach the device by unicast: fill `static_ip`
 / `gateway` / `subnet` in `secrets.yaml`. For a single-VLAN network you can
 delete the `manual_ip:` block from `bridge.yaml` and use DHCP.
 
+### Writing to the appliance (advanced, opt-in)
+
+The bridge does not write to the appliance unless you explicitly call the
+`send_command(index, value)` Home Assistant action that ships in `bridge.yaml`
+(plan §3.6). The action is present out of the box but **never fires on its own** —
+you invoke it deliberately. Remove the `actions:` block from `bridge.yaml` to make
+the bridge strictly read-only.
+
+> ⚠️ **Writes can physically operate the appliance** (e.g. start a wash cycle).
+> The command values are **appliance-specific and not validated by this project**.
+> Test with care, and never enable this where an unattended start could cause
+> harm or flooding. Remove the `actions:` block from `bridge.yaml` to make the
+> bridge strictly read-only.
+
+The writable target is the **device-state index** (`STATE`, index 34 on the
+washer — `program.wfaWriteIndex` is null in every known config, so you cannot set
+a program directly). The state enum values are in your generated `mapping.h`,
+e.g. `10=on, 20=off, 30=running, 40=paused, 60=delay`. Which value triggers which
+transition is firmware-specific — **verify on your own device.**
+
+Call it from Home Assistant (entity id derived from the device name):
+
+```yaml
+# Example HA service call — values are illustrative, verify on your device.
+action: esphome.homewhiz_bridge_send_command
+data:
+  index: 34
+  value: 40      # e.g. attempt "paused"
+```
+
+Or wire a template button:
+
+```yaml
+button:
+  - platform: template
+    name: "Washer Pause"
+    on_press:
+      - lambda: 'id(appliance)->send_command_key("STATE", 40);'
+```
+
 ## ESPHome version
 
 Pinned target: **ESPHome 2025.3.1** (esp-idf). `esphome compile bridge.yaml`
@@ -174,10 +214,12 @@ those names — the decode logic is unchanged.
       factor: 100          # byte 12 -> 1200 rpm
       unit_of_measurement: rpm
   ```
-- **Write path (start/pause) is a stretch goal.** `program.wfaWriteIndex` is null
-  in every known appliance config; the writable target is the device-state index
-  (`deviceStates.wifiArrayWriteIndex`, 34 on the washer). `send_command` is
-  scaffolded but not wired to entities by default — validate carefully on device.
+- **Write path ships enabled but inert.** The `send_command` action is present in
+  `bridge.yaml` (see
+  [Writing to the appliance](#writing-to-the-appliance-advanced-opt-in)), but never
+  fires on its own and its command values are appliance-specific and unvalidated —
+  invoke it deliberately, or remove the `actions:` block for a strictly read-only
+  bridge.
 - **One appliance per ESP (by design).** The component decodes against a single
   generated table, and appliances in different rooms are out of one ESP's BLE
   range anyway — so one ESP per appliance is the intended model, not a bug.

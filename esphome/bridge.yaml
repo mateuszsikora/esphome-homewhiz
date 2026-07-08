@@ -20,6 +20,21 @@ logger:
   level: DEBUG  # DEBUG shows the ble_client GATT dump + [scan] lines
 
 api:
+  # Opt-in write path (plan §3.6). Exposes a Home Assistant action to write a raw
+  # command (index, value) to the appliance. Nothing fires automatically.
+  #
+  # ⚠️ WRITES CAN PHYSICALLY OPERATE THE APPLIANCE (e.g. start a wash). The
+  # command values are appliance-specific and NOT validated by this project — see
+  # the "Writing to the appliance" section in the README before using. Remove
+  # this `actions:` block to make the bridge strictly read-only.
+  actions:
+    - action: send_command
+      variables:
+        index: int
+        value: int
+      then:
+        - lambda: 'id(appliance)->send_command((uint8_t) index, (uint8_t) value);'
+
 ota:
   - platform: esphome
 
