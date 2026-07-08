@@ -15,6 +15,21 @@ static const char *const TAG = "homewhiz";
 // README; if the build fails, adjust these names — the logic is unchanged.
 // ---------------------------------------------------------------------------
 
+void HomeWhiz::loop() {
+#ifdef USE_BINARY_SENSOR
+  // Publish the connectivity status on change (and once at boot, so HA shows
+  // "disconnected" rather than "unknown" before the first link).
+  if (this->connected_binary_sensor_ != nullptr) {
+    bool connected = this->is_connected();
+    if (!this->connected_published_ || connected != this->connected_state_) {
+      this->connected_binary_sensor_->publish_state(connected);
+      this->connected_state_ = connected;
+      this->connected_published_ = true;
+    }
+  }
+#endif
+}
+
 void HomeWhiz::dump_config() {
   ESP_LOGCONFIG(TAG, "HomeWhiz:");
   ESP_LOGCONFIG(TAG, "  Service UUID: %s", this->service_uuid_raw_.c_str());

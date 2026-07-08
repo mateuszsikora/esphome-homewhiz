@@ -80,6 +80,12 @@ homewhiz:
     # Confirmed on a live Beko EWUE7636XAW (AC01/AC02 live here). If yours
     # differs, find it in the ble_client GATT dump (plan §3.1 / T-B2).
     service_uuid: "0000ac00-0000-1000-8000-00805f9b34fb"
+    # Connectivity status: ON once connected + handshaken to the appliance, OFF
+    # when the BLE link is down (appliance powered off, out of range, or the
+    # phone app grabbed the single BLE slot). Lets HA distinguish live data from
+    # a stale last-known state. Delete this block if you don't want the entity.
+    connected:
+      name: "Bridge connected"
 
 # Entities are generated (numeric/progress -> sensor, enum/flag -> text_sensor).
 packages:
