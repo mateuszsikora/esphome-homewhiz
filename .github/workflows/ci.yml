@@ -24,13 +24,22 @@ jobs:
       - name: Host decode test (C++)
         run: bash tests/run.sh
 
-      - name: ESPHome config check
+      - name: ESPHome config check (all fixtures)
         run: |
           pip install esphome
-          # Generate the artifacts from the public washer fixture (no credentials).
-          python provisioning/generate_mapping.py \
-            provisioning/tests/fixtures/example_washing_machine_config.json \
-            --out esphome/components/homewhiz/mapping.h \
-            --entities-out esphome/homewhiz_entities.yaml
           cp esphome/secrets.yaml.example esphome/secrets.yaml
-          esphome config esphome/bridge.yaml
+          # Validate the generator + bridge.yaml against every appliance-shape
+          # fixture (washer/dryer/dishwasher/oven), not just the washer — catches
+          # generator regressions on field layouts the washer doesn't exercise.
+          # All fixtures are public config dumps; no credentials. Validate them
+          # all before failing, so one bad shape doesn't mask the others.
+          rc=0
+          for f in provisioning/tests/fixtures/*.json; do
+            echo "::group::$(basename "$f")"
+            python provisioning/generate_mapping.py "$f" \
+              --out esphome/components/homewhiz/mapping.h \
+              --entities-out esphome/homewhiz_entities.yaml
+            esphome config esphome/bridge.yaml || rc=1
+            echo "::endgroup::"
+          done
+          exit $rc
