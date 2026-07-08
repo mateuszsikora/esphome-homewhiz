@@ -94,12 +94,32 @@ int main() {
   frag0.insert(frag0.end(), frame.begin(), frame.begin() + split);
   frag1.insert(frag1.end(), frame.begin() + split, frame.end());
 
-  CHECK(acc.feed(frag0.data(), frag0.size(), out_len) == nullptr,
+  bool extra = false;
+  CHECK(acc.feed(frag0.data(), frag0.size(), out_len, &extra) == nullptr && !extra,
         "first fragment yields no frame yet");
-  const uint8_t *reassembled = acc.feed(frag1.data(), frag1.size(), out_len);
+  const uint8_t *reassembled = acc.feed(frag1.data(), frag1.size(), out_len, &extra);
   CHECK(reassembled != nullptr && out_len == len &&
-            std::memcmp(reassembled, f, len) == 0,
+            std::memcmp(reassembled, f, len) == 0 && !extra,
         "second fragment reassembles the original frame");
+
+  // --- a fragment beyond the two-fragment protocol (index >= 2) must be flagged
+  // via saw_extra_fragment (so the caller can log it) rather than silently
+  // truncating, and must not yield a frame. ---
+  std::vector<uint8_t> frag_extra(7, 0);
+  frag_extra[4] = 2;
+  frag_extra.insert(frag_extra.end(), frame.begin(), frame.begin() + 10);
+  extra = false;
+  CHECK(acc.feed(frag0.data(), frag0.size(), out_len, &extra) == nullptr && !extra,
+        "index-0 fragment does not set the extra-fragment flag");
+  const uint8_t *none = acc.feed(frag_extra.data(), frag_extra.size(), out_len, &extra);
+  CHECK(none == nullptr && extra,
+        "index-2 fragment yields no frame and flags an extra fragment");
+
+  // A resync (index 1 without a preceding index 0) is benign and must NOT flag.
+  acc.reset();
+  extra = false;
+  CHECK(acc.feed(frag1.data(), frag1.size(), out_len, &extra) == nullptr && !extra,
+        "orphan index-1 fragment resyncs without flagging an extra fragment");
 
   std::printf(failures ? "\n%d FAILURE(S)\n" : "\nALL PASSED\n", failures);
   return failures ? 1 : 0;
