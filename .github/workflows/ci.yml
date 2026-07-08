@@ -36,9 +36,14 @@ jobs:
           rc=0
           for f in provisioning/tests/fixtures/*.json; do
             echo "::group::$(basename "$f")"
+            # Guard the generator too (the step runs under `set -e`): on a
+            # generator regression, record the failure, close the group, and move
+            # on — otherwise the whole loop aborts and the remaining fixtures go
+            # unchecked, and `esphome config` would run against a stale mapping.h.
             python provisioning/generate_mapping.py "$f" \
               --out esphome/components/homewhiz/mapping.h \
-              --entities-out esphome/homewhiz_entities.yaml
+              --entities-out esphome/homewhiz_entities.yaml \
+              || { rc=1; echo "::endgroup::"; continue; }
             esphome config esphome/bridge.yaml || rc=1
             echo "::endgroup::"
           done
