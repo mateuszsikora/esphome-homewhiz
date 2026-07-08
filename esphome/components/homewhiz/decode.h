@@ -109,8 +109,19 @@ class MessageAccumulator {
   // Feed one notification. Returns pointer+len of a complete frame when the
   // second fragment arrives, else {nullptr, 0}. The returned buffer is owned by
   // the accumulator and valid until the next feed().
-  const uint8_t *feed(const uint8_t *msg, size_t len, size_t &out_len) {
+  //
+  // The state frame is exactly two fragments (index 0 then 1) — this is the
+  // protocol, not a simplification: upstream's MessageAccumulator assumes the
+  // same across washers/dryers/dishwashers/ovens/ACs, and there is no
+  // total-count or length field in the header to reassemble more. If a fragment
+  // with index >= 2 ever arrives, this appliance's frames exceed that protocol
+  // and CANNOT be reassembled here; *saw_extra_fragment (when non-null) is set so
+  // the caller can log it loudly instead of silently truncating. Not observed on
+  // any known appliance.
+  const uint8_t *feed(const uint8_t *msg, size_t len, size_t &out_len,
+                      bool *saw_extra_fragment = nullptr) {
     out_len = 0;
+    if (saw_extra_fragment != nullptr) *saw_extra_fragment = false;
     if (len < 7) return nullptr;
     uint8_t index = msg[4];
     if (index == 0) {
@@ -129,6 +140,10 @@ class MessageAccumulator {
       out_len = buf_len_;
       return buf_;
     }
+    // A fragment beyond the two-fragment protocol: report it so it doesn't
+    // silently vanish. (index == 1 without a preceding index 0 is a benign
+    // resync, so only flag index >= 2.)
+    if (index >= 2 && saw_extra_fragment != nullptr) *saw_extra_fragment = true;
     // Unexpected sequence: reset so we don't get permanently stuck.
     expected_ = 0;
     buf_len_ = 0;

@@ -130,8 +130,15 @@ void HomeWhiz::gattc_event_handler(esp_gattc_cb_event_t event,
       if (param->notify.value_len < 10)
         break;
       size_t out_len = 0;
-      const uint8_t *frame =
-          this->accumulator_.feed(param->notify.value, param->notify.value_len, out_len);
+      bool saw_extra_fragment = false;
+      const uint8_t *frame = this->accumulator_.feed(
+          param->notify.value, param->notify.value_len, out_len, &saw_extra_fragment);
+      if (saw_extra_fragment)
+        ESP_LOGW(TAG,
+                 "BLE state frame carries a fragment index >= 2: this appliance's "
+                 "frames span more than the two fragments the HomeWhiz protocol "
+                 "uses, so they cannot be reassembled and are dropped. Not seen on "
+                 "any known appliance — please open an issue with your model.");
       if (frame != nullptr)
         this->handle_frame_(frame, out_len);
       break;
