@@ -14,11 +14,15 @@ from . import CONF_HOMEWHIZ_ID, HomeWhiz, homewhiz_ns
 DEPENDENCIES = ["homewhiz"]
 
 CONF_KEY = "key"
+CONF_FACTOR = "factor"
 
 CONFIG_SCHEMA = sensor.sensor_schema().extend(
     {
         cv.GenerateID(CONF_HOMEWHIZ_ID): cv.use_id(HomeWhiz),
         cv.Required(CONF_KEY): cv.string,
+        # Force a numeric reading of (raw byte & 0x7F) * factor, even when the
+        # field is modelled as an enum. e.g. key: WASHER_SPIN, factor: 100 -> rpm.
+        cv.Optional(CONF_FACTOR): cv.positive_float,
     }
 )
 
@@ -26,4 +30,4 @@ CONFIG_SCHEMA = sensor.sensor_schema().extend(
 async def to_code(config):
     parent = await cg.get_variable(config[CONF_HOMEWHIZ_ID])
     sens = await sensor.new_sensor(config)
-    cg.add(parent.register_sensor(config[CONF_KEY], sens))
+    cg.add(parent.register_sensor(config[CONF_KEY], sens, config.get(CONF_FACTOR, 0.0)))
