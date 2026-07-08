@@ -149,10 +149,11 @@ delete the `manual_ip:` block from `bridge.yaml` and use DHCP.
 
 ### Writing to the appliance (advanced, opt-in)
 
-The bridge is read-only by default. `bridge.yaml` also ships an **opt-in** Home
-Assistant action, `send_command(index, value)`, that writes a raw command frame
-to the appliance (plan §3.6). Nothing fires automatically — you call it
-deliberately.
+The bridge does not write to the appliance unless you explicitly call the
+`send_command(index, value)` Home Assistant action that ships in `bridge.yaml`
+(plan §3.6). The action is present out of the box but **never fires on its own** —
+you invoke it deliberately. Remove the `actions:` block from `bridge.yaml` to make
+the bridge strictly read-only.
 
 > ⚠️ **Writes can physically operate the appliance** (e.g. start a wash cycle).
 > The command values are **appliance-specific and not validated by this project**.
@@ -213,10 +214,12 @@ those names — the decode logic is unchanged.
       factor: 100          # byte 12 -> 1200 rpm
       unit_of_measurement: rpm
   ```
-- **Write path is opt-in and unvalidated.** Writing works (see
-  [Writing to the appliance](#writing-to-the-appliance-advanced-opt-in)), but the
-  bridge is read-only by default and the command values are appliance-specific and
-  not validated here — enable and test deliberately.
+- **Write path ships enabled but inert.** The `send_command` action is present in
+  `bridge.yaml` (see
+  [Writing to the appliance](#writing-to-the-appliance-advanced-opt-in)), but never
+  fires on its own and its command values are appliance-specific and unvalidated —
+  invoke it deliberately, or remove the `actions:` block for a strictly read-only
+  bridge.
 - **One appliance per ESP (by design).** The component decodes against a single
   generated table, and appliances in different rooms are out of one ESP's BLE
   range anyway — so one ESP per appliance is the intended model, not a bug.
