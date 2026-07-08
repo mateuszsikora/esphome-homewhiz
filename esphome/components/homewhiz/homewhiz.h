@@ -33,7 +33,7 @@ static const uint8_t HOMEWHIZ_HANDSHAKE[8] = {0x02, 0x04, 0x00, 0x04,
 
 class HomeWhiz : public ble_client::BLEClientNode, public Component {
  public:
-  void loop() override {}
+  void loop() override;
   void dump_config() override;
   float get_setup_priority() const override { return setup_priority::AFTER_BLUETOOTH; }
 
@@ -61,6 +61,13 @@ class HomeWhiz : public ble_client::BLEClientNode, public Component {
 #ifdef USE_BINARY_SENSOR
   void register_binary_sensor(const std::string &key, binary_sensor::BinarySensor *s) {
     this->binary_sensors_.push_back({key, s});
+  }
+  // Optional hub-level status entity (device_class connectivity): true once
+  // connected + handshaken to the appliance. Not a mapping.h field — it reflects
+  // the BLE link, so HA can mark stale data unavailable when the appliance is off
+  // or out of range.
+  void set_connected_binary_sensor(binary_sensor::BinarySensor *s) {
+    this->connected_binary_sensor_ = s;
   }
 #endif
 
@@ -102,6 +109,9 @@ class HomeWhiz : public ble_client::BLEClientNode, public Component {
 #endif
 #ifdef USE_BINARY_SENSOR
   std::vector<std::pair<std::string, binary_sensor::BinarySensor *>> binary_sensors_;
+  binary_sensor::BinarySensor *connected_binary_sensor_{nullptr};
+  bool connected_published_{false};
+  bool connected_state_{false};
 #endif
 };
 
