@@ -61,7 +61,9 @@ tests/          host-side C++ decode test (no hardware needed)
 
 - An **ESP32** board (tested on `esp32dev`). BLE + Wi-Fi coexistence on a single
   radio can be marginal through a metal appliance enclosure — a board with an
-  external antenna, placed close to the appliance, is recommended.
+  external antenna, placed close to the appliance, is recommended. Run **one ESP
+  per appliance**: the component decodes against a single generated table, and
+  appliances in different rooms are out of one ESP's BLE range anyway.
 - [ESPHome](https://esphome.io) **2025.3.1** (esp-idf framework). See
   [ESPHome version](#esphome-version).
 - [uv](https://github.com/astral-sh/uv) for the provisioning Python project
@@ -139,6 +141,46 @@ The BLE characteristics are the same across all HomeWhiz appliances (notify
 Beko washer. If yours differs, the `ble_client` GATT dump in the DEBUG logs lists
 every service and its characteristics — pick the one containing `AC01` + `AC02`.
 
+### Connection status
+
+`bridge.yaml` exposes an optional `connected` binary_sensor (device class
+*connectivity*) on the `homewhiz` hub:
+
+```yaml
+homewhiz:
+  - id: appliance
+    service_uuid: "…"
+    connected:
+      name: "Bridge connected"
+```
+
+It is **on** while the ESP is connected and handshaken to the appliance, and
+**off** when the link is down — appliance powered off, out of BLE range, or the
+HomeWhiz phone app has grabbed the single BLE slot. Use it in Home Assistant to
+tell live readings apart from a stale last-known state, since the other entities
+keep their last value when the appliance goes away. Delete the `connected:` block
+to drop the entity.
+
+### Exposing numeric fields (spin, temperature)
+
+Some fields — notably `WASHER_SPIN` — are modelled in the appliance config as an
+enum with only a few landmark values (`no_spin`, `rinse_hold`), even though the
+byte is really numeric. By default they decode as text: a recognised landmark
+publishes its name, and any other value falls back to the raw number (e.g.
+`"12"`) rather than going stale. To expose such a field as a proper numeric
+sensor, add a `sensor` for the same `key` with a `factor` — the reading becomes
+`(raw byte) * factor`:
+
+```yaml
+sensor:
+  - platform: homewhiz
+    homewhiz_id: appliance
+    key: WASHER_SPIN
+    name: "Spin speed"
+    factor: 100          # byte 12 -> 1200 rpm
+    unit_of_measurement: rpm
+```
+
 ### Static IP (cross-VLAN)
 
 If Home Assistant or your dev machine is on a **different VLAN** than the ESP,
@@ -197,32 +239,17 @@ those names — the decode logic is unchanged.
 
 ## Known limitations
 
-- **Spin/temperature are sparse enums, not raw numbers.** Some fields (notably
-  `WASHER_SPIN`) are modelled in the config as an enum with only a few landmark
-  values (`no_spin`, `rinse_hold`), even though the byte is really numeric. For
-  an unrecognised value the text_sensor falls back to publishing the raw number
-  (e.g. `"12"`) rather than going stale. To expose it as a proper numeric sensor,
-  add a `sensor` for the same key with a `factor` — the reading becomes
-  `(raw byte) * factor`:
-
-  ```yaml
-  sensor:
-    - platform: homewhiz
-      homewhiz_id: appliance
-      key: WASHER_SPIN
-      name: "Spin speed"
-      factor: 100          # byte 12 -> 1200 rpm
-      unit_of_measurement: rpm
-  ```
-- **Write path ships enabled but inert.** The `send_command` action is present in
-  `bridge.yaml` (see
-  [Writing to the appliance](#writing-to-the-appliance-advanced-opt-in)), but never
-  fires on its own and its command values are appliance-specific and unvalidated —
-  invoke it deliberately, or remove the `actions:` block for a strictly read-only
-  bridge.
-- **One appliance per ESP (by design).** The component decodes against a single
-  generated table, and appliances in different rooms are out of one ESP's BLE
-  range anyway — so one ESP per appliance is the intended model, not a bug.
+- **Write commands are unvalidated.** The opt-in `send_command` action (see
+  [Writing to the appliance](#writing-to-the-appliance-advanced-opt-in)) can
+  physically operate the appliance, and its command values are appliance-specific
+  and **not validated by this project**. Invoke it deliberately, or remove the
+  `actions:` block from `bridge.yaml` for a strictly read-only bridge.
+- **State frames spanning more than two BLE fragments aren't reassembled.** The
+  HomeWhiz state frame is exactly two fragments — this matches upstream, and there
+  is no total-count field in the header to reassemble more. A frame carrying a
+  third fragment is dropped and logged with a loud `WARNING` rather than silently
+  truncated. Not observed on any known appliance; if you hit it, please open an
+  issue with your model.
 - **Air conditioners (roadmap).** AC units map onto Home Assistant's `climate`
   domain rather than `sensor`/`text_sensor`, so they aren't covered by the generic
   entity set yet. A `climate` platform would be a natural follow-up.
@@ -239,6 +266,11 @@ bash tests/run.sh
 
 The decode core (`esphome/components/homewhiz/decode.h`) is deliberately free of
 any ESPHome/ESP-IDF dependency so it can be unit-tested on the host.
+
+CI runs both of the above and then `esphome config` against **every** fixture in
+`provisioning/tests/fixtures/` (washer/dryer/dishwasher/oven), so a generator
+change that breaks an appliance shape the washer doesn't exercise is caught
+without hardware.
 
 ## Security
 
