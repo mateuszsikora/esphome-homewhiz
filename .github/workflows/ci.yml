@@ -14,6 +14,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          # These jobs only read the repo; don't leave the token in git config.
+          persist-credentials: false
 
       - uses: actions/setup-python@v5
         with:
@@ -61,8 +64,14 @@ jobs:
     # building the firmware against the pinned ESPHome catches both, no hardware
     # needed. Runs in parallel with `test` so the fast checks stay fast.
     runs-on: ubuntu-latest
+    # A cold build is ~3 min; bound it so a hung toolchain download can't sit on
+    # GitHub's 6-hour default.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          # These jobs only read the repo; don't leave the token in git config.
+          persist-credentials: false
 
       - uses: actions/setup-python@v5
         with:
@@ -81,6 +90,9 @@ jobs:
       - name: Install ESPHome + generator dep
         run: pip install "esphome==${ESPHOME_VERSION}" dacite
 
+      # Only the washer shape is compiled here: a full build is slow, and the
+      # other fixtures (dryer/dishwasher/oven) are already schema-checked by the
+      # `test` job. One shape is enough to catch codegen / C++ regressions.
       - name: Generate artifacts (washer fixture)
         run: |
           python provisioning/generate_mapping.py \
