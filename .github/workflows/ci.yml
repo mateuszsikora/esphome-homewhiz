@@ -4,6 +4,11 @@ on:
   push:
   pull_request:
 
+env:
+  # The component is pinned to this ESPHome release (see README): its low-level
+  # BLE GATT accessors drift across versions. Test against exactly that version.
+  ESPHOME_VERSION: "2025.3.1"
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -26,7 +31,7 @@ jobs:
 
       - name: ESPHome config check (all fixtures)
         run: |
-          pip install esphome
+          pip install "esphome==${ESPHOME_VERSION}"
           cp esphome/secrets.yaml.example esphome/secrets.yaml
           # Validate the generator + bridge.yaml against every appliance-shape
           # fixture (washer/dryer/dishwasher/oven), not just the washer — catches
@@ -48,3 +53,41 @@ jobs:
             echo "::endgroup::"
           done
           exit $rc
+
+  compile:
+    # `esphome config` only validates the schema — it never runs codegen, so a
+    # to_code() bug (e.g. the binary_sensor import shadowing fixed in #7) or a C++
+    # error compiles fine in CI's eyes and only blows up at `esphome run`. Actually
+    # building the firmware against the pinned ESPHome catches both, no hardware
+    # needed. Runs in parallel with `test` so the fast checks stay fast.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache PlatformIO / esp-idf toolchain
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            ~/.cache/pip
+          key: ${{ runner.os }}-pio-esphome-${{ env.ESPHOME_VERSION }}-${{ hashFiles('esphome/bridge.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pio-esphome-${{ env.ESPHOME_VERSION }}-
+
+      - name: Install ESPHome + generator dep
+        run: pip install "esphome==${ESPHOME_VERSION}" dacite
+
+      - name: Generate artifacts (washer fixture)
+        run: |
+          python provisioning/generate_mapping.py \
+            provisioning/tests/fixtures/example_washing_machine_config.json \
+            --out esphome/components/homewhiz/mapping.h \
+            --entities-out esphome/homewhiz_entities.yaml
+          cp esphome/secrets.yaml.example esphome/secrets.yaml
+
+      - name: Compile firmware
+        run: esphome compile esphome/bridge.yaml
