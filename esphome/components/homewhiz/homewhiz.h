@@ -50,17 +50,17 @@ class HomeWhiz : public ble_client::BLEClientNode, public Component {
   // factor > 0 forces a numeric reading (raw byte & 0x7F) * factor, even when the
   // field is modelled as an enum (e.g. spin: byte 12 -> 1200 rpm with factor 100).
   void register_sensor(const std::string &key, sensor::Sensor *s, float factor = 0.0f) {
-    this->sensors_.push_back({key, s, factor});
+    this->sensors_.push_back({key, s, factor, 0.0f, false});
   }
 #endif
 #ifdef USE_TEXT_SENSOR
   void register_text_sensor(const std::string &key, text_sensor::TextSensor *s) {
-    this->text_sensors_.push_back({key, s});
+    this->text_sensors_.push_back({key, s, std::string(), false});
   }
 #endif
 #ifdef USE_BINARY_SENSOR
   void register_binary_sensor(const std::string &key, binary_sensor::BinarySensor *s) {
-    this->binary_sensors_.push_back({key, s});
+    this->binary_sensors_.push_back({key, s, false, false});
   }
   // Optional hub-level status entity (device_class connectivity): true once
   // connected + handshaken to the appliance. Not a mapping.h field — it reflects
@@ -96,19 +96,38 @@ class HomeWhiz : public ble_client::BLEClientNode, public Component {
 
   MessageAccumulator accumulator_;
 
+  // Each entry caches the last value it published so handle_frame_ can skip
+  // republishing unchanged fields: the appliance streams the full state on every
+  // frame (several a second), so without this every entity re-publishes
+  // constantly — spamming the API/logs and blocking the BLE stack. `published`
+  // guards the first frame, when there's no previous value to compare against.
 #ifdef USE_SENSOR
   struct SensorEntry {
     std::string key;
     sensor::Sensor *sensor;
     float factor;  // 0 = decode by field kind; >0 = force numeric raw*factor
+    float last;
+    bool published;
   };
   std::vector<SensorEntry> sensors_;
 #endif
 #ifdef USE_TEXT_SENSOR
-  std::vector<std::pair<std::string, text_sensor::TextSensor *>> text_sensors_;
+  struct TextSensorEntry {
+    std::string key;
+    text_sensor::TextSensor *sensor;
+    std::string last;
+    bool published;
+  };
+  std::vector<TextSensorEntry> text_sensors_;
 #endif
 #ifdef USE_BINARY_SENSOR
-  std::vector<std::pair<std::string, binary_sensor::BinarySensor *>> binary_sensors_;
+  struct BinarySensorEntry {
+    std::string key;
+    binary_sensor::BinarySensor *sensor;
+    bool last;
+    bool published;
+  };
+  std::vector<BinarySensorEntry> binary_sensors_;
   binary_sensor::BinarySensor *connected_binary_sensor_{nullptr};
   bool connected_published_{false};
   bool connected_state_{false};

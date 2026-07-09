@@ -58,15 +58,15 @@ void HomeWhiz::dump_config() {
   }
 #endif
 #ifdef USE_TEXT_SENSOR
-  for (auto &kv : this->text_sensors_) {
-    const FieldDesc *d = hw_find_field(kv.first.c_str());
-    check("Text sensor", kv.first, d != nullptr && d->kind == KIND_ENUM);
+  for (auto &e : this->text_sensors_) {
+    const FieldDesc *d = hw_find_field(e.key.c_str());
+    check("Text sensor", e.key, d != nullptr && d->kind == KIND_ENUM);
   }
 #endif
 #ifdef USE_BINARY_SENSOR
-  for (auto &kv : this->binary_sensors_) {
-    const FieldDesc *d = hw_find_field(kv.first.c_str());
-    check("Binary sensor", kv.first, d != nullptr && d->kind == KIND_FLAG);
+  for (auto &e : this->binary_sensors_) {
+    const FieldDesc *d = hw_find_field(e.key.c_str());
+    check("Binary sensor", e.key, d != nullptr && d->kind == KIND_FLAG);
   }
 #endif
 }
@@ -172,36 +172,56 @@ void HomeWhiz::gattc_event_handler(esp_gattc_cb_event_t event,
 }
 
 void HomeWhiz::handle_frame_(const uint8_t *frame, size_t len) {
+  // The appliance re-sends the whole state on every frame, so publish only the
+  // fields that actually changed since we last published them (see the entry
+  // structs). This keeps a steady state from re-emitting ~24 entities several
+  // times a second — which spammed the API and blocked the BLE stack.
   DecodedField v;
 #ifdef USE_SENSOR
   for (auto &e : this->sensors_) {
     const FieldDesc *d = hw_find_field(e.key.c_str());
     if (d == nullptr)
       continue;
+    float value;
     if (e.factor > 0.0f) {
       // Forced numeric: raw value * factor (e.g. enum-modelled spin -> rpm).
-      e.sensor->publish_state(hw_value(frame, len, d->index) * e.factor);
+      value = hw_value(frame, len, d->index) * e.factor;
     } else if (hw_decode(*d, frame, len, v) && v.type == DECODED_NUMBER) {
-      e.sensor->publish_state(v.number);
+      value = v.number;
+    } else {
+      continue;
+    }
+    if (!e.published || value != e.last) {
+      e.sensor->publish_state(value);
+      e.last = value;
+      e.published = true;
     }
   }
 #endif
 #ifdef USE_TEXT_SENSOR
-  for (auto &kv : this->text_sensors_) {
-    const FieldDesc *d = hw_find_field(kv.first.c_str());
+  for (auto &e : this->text_sensors_) {
+    const FieldDesc *d = hw_find_field(e.key.c_str());
     if (d == nullptr)
       continue;
-    if (hw_decode(*d, frame, len, v) && v.type == DECODED_TEXT)
-      kv.second->publish_state(v.text);
+    if (hw_decode(*d, frame, len, v) && v.type == DECODED_TEXT &&
+        (!e.published || e.last != v.text)) {
+      e.sensor->publish_state(v.text);
+      e.last = v.text;  // copies the string; v.text may point at scratch
+      e.published = true;
+    }
   }
 #endif
 #ifdef USE_BINARY_SENSOR
-  for (auto &kv : this->binary_sensors_) {
-    const FieldDesc *d = hw_find_field(kv.first.c_str());
+  for (auto &e : this->binary_sensors_) {
+    const FieldDesc *d = hw_find_field(e.key.c_str());
     if (d == nullptr)
       continue;
-    if (hw_decode(*d, frame, len, v) && v.type == DECODED_BOOL)
-      kv.second->publish_state(v.boolean);
+    if (hw_decode(*d, frame, len, v) && v.type == DECODED_BOOL &&
+        (!e.published || e.last != v.boolean)) {
+      e.sensor->publish_state(v.boolean);
+      e.last = v.boolean;
+      e.published = true;
+    }
   }
 #endif
 }
