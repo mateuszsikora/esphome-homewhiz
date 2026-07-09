@@ -7,7 +7,15 @@ appliance; no code here changes.
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import ble_client, binary_sensor
+from esphome.components import ble_client
+
+# Import the core binary_sensor component under an alias. A bare
+# `import ... binary_sensor` is unsafe here: this component ships a
+# `binary_sensor.py` platform, and once ESPHome imports that submodule Python
+# rebinds the package attribute `binary_sensor` to it — shadowing the core
+# module by the time to_code() runs (schema build happens earlier, which is why
+# `esphome config` didn't catch it). The alias can't be clobbered that way.
+from esphome.components import binary_sensor as core_binary_sensor
 from esphome.const import CONF_ID, DEVICE_CLASS_CONNECTIVITY, ENTITY_CATEGORY_DIAGNOSTIC
 
 CODEOWNERS = ["@you"]
@@ -35,7 +43,7 @@ CONFIG_SCHEMA = (
             # Optional hub-level connectivity status entity. Reflects the BLE
             # link (connected + handshaken), so HA can tell "appliance off / out
             # of range" from live data.
-            cv.Optional(CONF_CONNECTED): binary_sensor.binary_sensor_schema(
+            cv.Optional(CONF_CONNECTED): core_binary_sensor.binary_sensor_schema(
                 device_class=DEVICE_CLASS_CONNECTIVITY,
                 entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
             ),
@@ -52,5 +60,5 @@ async def to_code(config):
     await ble_client.register_ble_node(var, config)
     cg.add(var.set_service_uuid(config[CONF_SERVICE_UUID]))
     if CONF_CONNECTED in config:
-        sens = await binary_sensor.new_binary_sensor(config[CONF_CONNECTED])
+        sens = await core_binary_sensor.new_binary_sensor(config[CONF_CONNECTED])
         cg.add(var.set_connected_binary_sensor(sens))
