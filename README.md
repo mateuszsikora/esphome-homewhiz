@@ -233,8 +233,9 @@ button:
 
 Pinned target: **ESPHome 2026.6.5** (esp-idf). `esphome compile bridge.yaml`
 builds cleanly against it (~60% flash on `esp32dev`), and CI compiles the firmware
-on every push, so a breaking change in a future ESPHome release is caught
-automatically. The component uses low-level BLE GATT accessors (`get_gattc_if`,
+on every push, so a change that breaks the build against this pin is caught before
+merge. CI won't flag a *newer* ESPHome release on its own — bump the pin and let it
+rebuild to validate one. The component uses low-level BLE GATT accessors (`get_gattc_if`,
 `get_conn_id`, `get_remote_bda`, `get_characteristic`) that can drift across
 releases; if a build fails on a newer version, adjust those names — the decode
 logic is unchanged.
