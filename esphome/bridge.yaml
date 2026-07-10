@@ -6,7 +6,7 @@
 # Regenerate both with provisioning/ and this same yaml serves any HomeWhiz
 # appliance — no edits here. See README.
 #
-# Pinned ESPHome: 2025.3.1 (esp-idf).
+# Pinned ESPHome: 2026.6.5 (esp-idf).
 
 esphome:
   name: homewhiz-bridge

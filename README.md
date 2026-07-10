@@ -64,7 +64,7 @@ tests/          host-side C++ decode test (no hardware needed)
   external antenna, placed close to the appliance, is recommended. Run **one ESP
   per appliance**: the component decodes against a single generated table, and
   appliances in different rooms are out of one ESP's BLE range anyway.
-- [ESPHome](https://esphome.io) **2025.3.1** (esp-idf framework). See
+- [ESPHome](https://esphome.io) **2026.6.5** (esp-idf framework). See
   [ESPHome version](#esphome-version).
 - [uv](https://github.com/astral-sh/uv) for the provisioning Python project
   (or any Python 3.12 environment).
@@ -231,11 +231,13 @@ button:
 
 ## ESPHome version
 
-Pinned target: **ESPHome 2025.3.1** (esp-idf). `esphome compile bridge.yaml`
-builds cleanly against it (~68% flash on `esp32dev`). The BLE GATT accessor names
-(`get_gattc_if`, `get_conn_id`, `get_remote_bda`, `get_characteristic`) have
-drifted across ESPHome releases; if the build fails on a different version, adjust
-those names — the decode logic is unchanged.
+Pinned target: **ESPHome 2026.6.5** (esp-idf). `esphome compile bridge.yaml`
+builds cleanly against it (~60% flash on `esp32dev`), and CI compiles the firmware
+on every push, so a breaking change in a future ESPHome release is caught
+automatically. The component uses low-level BLE GATT accessors (`get_gattc_if`,
+`get_conn_id`, `get_remote_bda`, `get_characteristic`) that can drift across
+releases; if a build fails on a newer version, adjust those names — the decode
+logic is unchanged.
 
 ## Known limitations
 
