@@ -98,10 +98,14 @@ void HomeWhiz::gattc_event_handler(esp_gattc_cb_event_t event,
                                    esp_ble_gattc_cb_param_t *param) {
   switch (event) {
     case ESP_GATTC_OPEN_EVT: {
-      if (param->open.status != ESP_GATT_OK)
+      if (param->open.status != ESP_GATT_OK) {
         ESP_LOGW(TAG, "GATT open failed: status=%d", param->open.status);
-      // Mark when the link opened, so DISCONNECT can report how long it held.
-      this->connect_time_ms_ = millis();
+      } else {
+        // Mark when the link opened, so DISCONNECT can report how long it held.
+        // Only on success, so connect_time_ms_ stays 0 for a link that never
+        // opened (keeps the "held" figure honest on a later disconnect).
+        this->connect_time_ms_ = millis();
+      }
       // Request a larger MTU so the ~77-byte state frame arrives in two
       // fragments rather than many (plan §3.3). ble_client usually negotiates
       // this already; requesting is idempotent.
