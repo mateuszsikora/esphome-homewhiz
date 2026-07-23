@@ -60,6 +60,14 @@ external_components:
 # connected to the appliance — so with appliance_mac unset/wrong you get the
 # nearby MACs to pick from, and once the correct MAC connects the scan goes
 # quiet automatically. HomeWhiz appliances advertise a name starting "HwZ_".
+#
+# Weak-link tuning: the ESP has ONE radio, time-shared between this scan and the
+# appliance connection. `active: true` (needed to read advertised names during
+# first-time MAC discovery) transmits scan requests and competes hardest for the
+# radio. Once appliance_mac is set you no longer need discovery, so on a marginal
+# link (see "Bridge RSSI" below) frequent reason=0x08 (supervision timeout) drops
+# can be aggravated by scanning. To test: set `active: false` and re-flash, then
+# watch whether the "held" times in the [homewhiz] disconnect log grow.
 esp32_ble_tracker:
   scan_parameters:
     active: true
@@ -86,6 +94,21 @@ homewhiz:
     # a stale last-known state. Delete this block if you don't want the entity.
     connected:
       name: "Bridge connected"
+
+# Signal strength of the LIVE link to the appliance: connection RSSI read via
+# esp_ble_gap_read_rssi (ESPHome's built-in ble_client rssi sensor) — NOT scan
+# RSSI, which stops updating once connected. HomeWhiz radios sit inside a metal
+# appliance, so the link is often marginal; below roughly -80 dBm you start
+# seeing supervision-timeout drops (reason=0x08 in the [homewhiz] disconnect
+# log). Graph this against "Bridge connected" in HA to confirm whether the
+# disconnects line up with a weak signal. Delete this block if you don't want it.
+sensor:
+  - platform: ble_client
+    ble_client_id: appliance_ble
+    type: rssi
+    name: "Bridge RSSI"
+    update_interval: 10s
+    entity_category: diagnostic
 
 # Entities are generated (numeric/progress -> sensor, enum/flag -> text_sensor).
 packages:
