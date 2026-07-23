@@ -2,6 +2,7 @@
 
 #include "homewhiz.h"
 #include "esphome/core/log.h"
+#include "esphome/core/hal.h"  // millis()
 
 namespace esphome {
 namespace homewhiz {
@@ -97,6 +98,10 @@ void HomeWhiz::gattc_event_handler(esp_gattc_cb_event_t event,
                                    esp_ble_gattc_cb_param_t *param) {
   switch (event) {
     case ESP_GATTC_OPEN_EVT: {
+      if (param->open.status != ESP_GATT_OK)
+        ESP_LOGW(TAG, "GATT open failed: status=%d", param->open.status);
+      // Mark when the link opened, so DISCONNECT can report how long it held.
+      this->connect_time_ms_ = millis();
       // Request a larger MTU so the ~77-byte state frame arrives in two
       // fragments rather than many (plan §3.3). ble_client usually negotiates
       // this already; requesting is idempotent.
@@ -159,6 +164,18 @@ void HomeWhiz::gattc_event_handler(esp_gattc_cb_event_t event,
       break;
     }
     case ESP_GATTC_DISCONNECT_EVT: {
+      // Log WHY the link dropped + how long it held, to tell benign causes apart
+      // from RF instability. reason is the HCI error code (esp_gatt_conn_reason_t):
+      //   0x08 = supervision timeout   -> RF/range: real instability
+      //   0x13 = peer closed the link  -> appliance powered off / dropped us
+      //   0x16 = local host closed      -> our stack closed it (e.g. slot reused)
+      //   0x3e = failed to establish    -> connection never really came up
+      // handshaked=no means it dropped before we finished the handshake.
+      float held_s =
+          this->connect_time_ms_ != 0 ? (millis() - this->connect_time_ms_) / 1000.0f : 0.0f;
+      ESP_LOGW(TAG, "Disconnected: reason=0x%02x, held %.1fs, handshaked=%s",
+               param->disconnect.reason, held_s, this->handshaken_ ? "yes" : "no");
+      this->connect_time_ms_ = 0;
       this->handshaken_ = false;
       this->notify_handle_ = 0;
       this->write_handle_ = 0;
