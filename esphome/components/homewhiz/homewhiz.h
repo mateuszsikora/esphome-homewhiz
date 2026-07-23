@@ -93,6 +93,9 @@ class HomeWhiz : public ble_client::BLEClientNode, public Component {
   uint16_t notify_handle_{0};
   uint16_t write_handle_{0};
   bool handshaken_{false};
+  // millis() when the BLE link opened (0 = not connected). Used only to report
+  // connection lifetime in the DISCONNECT log.
+  uint32_t connect_time_ms_{0};
 
   MessageAccumulator accumulator_;
 
