@@ -19,10 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-This project vendors `provisioning/vendor/api.py` and
-`provisioning/vendor/appliance_config.py` from the home-assistant-HomeWhiz
-project (https://github.com/home-assistant-HomeWhiz/home-assistant-HomeWhiz),
-which is MIT-licensed. See provisioning/vendor/LICENSE.upstream.

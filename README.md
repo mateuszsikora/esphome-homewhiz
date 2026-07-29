@@ -1,7 +1,10 @@
 # esphome-homewhiz
 
+[![CI](https://github.com/mateuszsikora/esphome-homewhiz/actions/workflows/ci.yml/badge.svg)](https://github.com/mateuszsikora/esphome-homewhiz/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 A **local, cloud-free bridge** from HomeWhiz appliances (Beko / Grundig /
-Arçelik) to Home Assistant, running as an [ESPHome](https://esphome.io) external
+Bauknecht / Arçelik) to Home Assistant, running as an [ESPHome](https://esphome.io) external
 component on an ESP32 over Bluetooth LE.
 
 No HomeWhiz cloud or phone app at runtime. You log into the cloud **once**, on
@@ -11,6 +14,40 @@ talks only to the appliance over BLE and only to Home Assistant over your LAN.
 > Validated end-to-end on a Beko EWUE7636XAW washing machine: the ESP32 connects,
 > handshakes, and publishes 24 entities (state, program, temperature, remaining
 > time, warning flags, …) to Home Assistant.
+
+![Beko washer entities in Home Assistant during a wash cycle — state running, time remaining counting down, link RSSI](docs/screenshot.png)
+
+## Why not a Bluetooth proxy?
+
+The usual way to get a HomeWhiz appliance (Beko, Grundig, Bauknecht, Arçelik)
+into Home Assistant is the HomeWhiz custom integration over an
+ESPHome **Bluetooth proxy**. If you've run that, you may know the symptoms:
+
+- the appliance **drops off Home Assistant every few hours**, back only after you
+  power-cycle its Bluetooth *and* reload the integration;
+- entities stuck **`unavailable`** right after setup, the Bluetooth icon blinking.
+
+HomeWhiz radios (advertised as `HwZ_…`) allow **one** BLE connection at a time, and a
+proxy leaves that connection with no clear owner. **This bridge removes the proxy:**
+the ESP32 holds the link itself and rebuilds it in seconds if it drops — Home
+Assistant only ever sees live data or a clean "disconnected."
+
+> **The catch is physics, not software:** the appliance's radio is weak and buried
+> in metal, so link quality comes down to distance. Mount the ESP32 next to it and
+> watch the built-in **Bridge RSSI** sensor — below roughly −80 dBm you'll see
+> dropouts.
+
+## Is this for you?
+
+**Use this if** you want a fully local link with no Bluetooth-proxy instability, and
+you're fine with a one-time provisioning step plus one ESP32 mounted near the
+appliance.
+
+**Stick with the standard HomeWhiz integration if** the proxy path is already stable
+for you and you'd rather not add hardware: it needs no dedicated ESP per appliance and
+fetches the appliance model from the cloud itself, whereas this bridge has you
+generate that model once during provisioning and regenerate it if the appliance
+changes.
 
 ## Highlights
 
@@ -64,7 +101,7 @@ tests/          host-side C++ decode test (no hardware needed)
   external antenna, placed close to the appliance, is recommended. Run **one ESP
   per appliance**: the component decodes against a single generated table, and
   appliances in different rooms are out of one ESP's BLE range anyway.
-- [ESPHome](https://esphome.io) **2026.6.5** (esp-idf framework). See
+- [ESPHome](https://esphome.io) **2026.7.2** (esp-idf framework). See
   [ESPHome version](#esphome-version).
 - [uv](https://github.com/astral-sh/uv) for the provisioning Python project
   (or any Python 3.12 environment).
@@ -161,6 +198,15 @@ tell live readings apart from a stale last-known state, since the other entities
 keep their last value when the appliance goes away. Delete the `connected:` block
 to drop the entity.
 
+### What updates, and when
+
+The appliance streams its full state, but each entity only changes when its value
+does. **Runtime** fields — `state`, `substate`, `remaining`, `duration` — move as a
+cycle progresses. **Configuration** fields — `programme`, `temperature`, `spin`, and
+the option flags — stay put until you change that setting on the appliance itself.
+So an idle machine shows a static snapshot of its last-selected settings — that's
+expected, not a stuck entity.
+
 ### Exposing numeric fields (spin, temperature)
 
 Some fields — notably `WASHER_SPIN` — are modelled in the appliance config as an
@@ -231,7 +277,7 @@ button:
 
 ## ESPHome version
 
-Pinned target: **ESPHome 2026.6.5** (esp-idf). `esphome compile bridge.yaml`
+Pinned target: **ESPHome 2026.7.2** (esp-idf). `esphome compile bridge.yaml`
 builds cleanly against it (~60% flash on `esp32dev`), and CI compiles the firmware
 on every push, so a change that breaks the build against this pin is caught before
 merge. CI won't flag a *newer* ESPHome release on its own — bump the pin and let it
@@ -253,6 +299,12 @@ logic is unchanged.
   third fragment is dropped and logged with a loud `WARNING` rather than silently
   truncated. Not observed on any known appliance; if you hit it, please open an
   issue with your model.
+- **Door-open flag may not track.** On the appliance this was built against (Beko
+  EWUE7636XAW), the `door_is_open` binary_sensor stays `off` even with the door
+  physically open. It may reflect the door **lock** during a cycle rather than the
+  physical door, or the bit may differ per model — one data point isn't enough to
+  tell. If yours behaves differently, a note (model + whether the flag tracks) in an
+  issue helps.
 - **Air conditioners (roadmap).** AC units map onto Home Assistant's `climate`
   domain rather than `sensor`/`text_sensor`, so they aren't covered by the generic
   entity set yet. A `climate` platform would be a natural follow-up.
