@@ -7,7 +7,7 @@ appliance; no code here changes.
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.components import ble_client
+from esphome.components import ble_client, esp32_ble_tracker
 
 # Import the core binary_sensor component under an alias. A bare
 # `import ... binary_sensor` is unsafe here: this component ships a
@@ -40,7 +40,7 @@ CONFIG_SCHEMA = (
             # Model-specific; the only runtime unknown (plan §3.1 / T-B2).
             # If it's wrong, the component logs the appliance's GATT table on
             # connect; pick the service that lists both AC01 and AC02.
-            cv.Required(CONF_SERVICE_UUID): cv.string,
+            cv.Required(CONF_SERVICE_UUID): esp32_ble_tracker.bt_uuid,
             # Optional hub-level connectivity status entity. Reflects the BLE
             # link (connected + handshaken), so HA can tell "appliance off / out
             # of range" from live data.

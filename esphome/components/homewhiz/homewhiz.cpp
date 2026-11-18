@@ -76,48 +76,78 @@ void HomeWhiz::log_gatt_hint_() {
   // Tell apart "service_uuid matched nothing" from "service matched, but it
   // lacks AC01/AC02" — the two need different fixes.
   bool service_found = this->parent()->get_service(this->service_uuid_) != nullptr;
-  ESP_LOGE(TAG,
-           "AC01/AC02 not found under service '%s' (service %s). The correct "
-           "service_uuid is the one whose characteristics include both 0xAC01 "
-           "and 0xAC02 — see the GATT table below.",
-           this->service_uuid_raw_.c_str(),
-           service_found ? "found" : "NOT found");
-  this->log_gatt_table_();
+  if (!service_found) {
+    ESP_LOGE(TAG,
+             "service_uuid '%s' matches no service on the appliance. Use the "
+             "service that lists both 0xAC01 and 0xAC02 in the GATT table%s.",
+             this->service_uuid_raw_.c_str(),
+             this->gatt_table_logged_ ? " logged at the first failure since boot"
+                                      : " below");
+  } else {
+    ESP_LOGE(TAG,
+             "AC01/AC02 not found under service '%s'. If the GATT table%s lists "
+             "them under this service, please open an issue with this log; "
+             "otherwise use the service that lists both.",
+             this->service_uuid_raw_.c_str(),
+             this->gatt_table_logged_ ? " logged at the first failure since boot"
+                                      : " below");
+  }
+  // The appliance drops the link without a handshake and ble_client reconnects
+  // every ~10 s, so dump the table once per boot rather than on every attempt.
+  if (!this->gatt_table_logged_) {
+    this->log_gatt_table_();
+    this->gatt_table_logged_ = true;
+  }
 }
 
 void HomeWhiz::log_gatt_table_() {
   // Dump the peer's GATT table straight from the ESP-IDF cache (the same source
   // the ESPHome Bluetooth proxy reads). ESPHome's own service/characteristic
-  // dump is only compiled in at logger level VERBOSE; this one shows at the
-  // default level, which is all a user needs to pick the right service_uuid.
-  // Loops are capped so a misbehaving stack can't spin here forever.
-  static const uint16_t MAX_ENTRIES = 32;
+  // dump is only compiled in at logger level VERBOSE; this one is logged as
+  // warnings, so it shows at the default level.
+  // Loops are capped so a misbehaving stack can't spin here forever. Past the
+  // last entry ESP-IDF returns ESP_GATT_INVALID_OFFSET, which ends a loop.
+  static constexpr uint16_t MAX_ENTRIES = 32;
   auto gattc_if = this->parent()->get_gattc_if();
   auto conn_id = this->parent()->get_conn_id();
   char uuid_buf[esp32_ble_tracker::UUID_STR_LEN];
-  ESP_LOGW(TAG, "GATT table of the appliance:");
-  for (uint16_t s = 0; s < MAX_ENTRIES; s++) {
+  ESP_LOGW(TAG, "GATT table of the appliance (16-bit UUIDs go into service_uuid "
+                "without the 0x, e.g. \"AC00\"):");
+  uint16_t s = 0;
+  for (; s < MAX_ENTRIES; s++) {
     esp_gattc_service_elem_t svc;
     uint16_t svc_count = 1;
-    if (esp_ble_gattc_get_service(gattc_if, conn_id, nullptr, &svc, &svc_count, s) !=
-            ESP_GATT_OK ||
-        svc_count == 0)
+    auto status =
+        esp_ble_gattc_get_service(gattc_if, conn_id, nullptr, &svc, &svc_count, s);
+    if (status != ESP_GATT_OK || svc_count == 0) {
+      if (s == 0)
+        ESP_LOGW(TAG, "  (no services in the ESP-IDF cache, status=%d)", status);
       break;
+    }
     ESP_LOGW(TAG, "  service %s, handles 0x%04x-0x%04x",
              esp32_ble_tracker::ESPBTUUID::from_uuid(svc.uuid).to_str(uuid_buf),
              svc.start_handle, svc.end_handle);
-    for (uint16_t c = 0; c < MAX_ENTRIES; c++) {
+    uint16_t c = 0;
+    for (; c < MAX_ENTRIES; c++) {
       esp_gattc_char_elem_t chr;
       uint16_t chr_count = 1;
-      if (esp_ble_gattc_get_all_char(gattc_if, conn_id, svc.start_handle, svc.end_handle,
-                                     &chr, &chr_count, c) != ESP_GATT_OK ||
-          chr_count == 0)
+      auto chr_status = esp_ble_gattc_get_all_char(
+          gattc_if, conn_id, svc.start_handle, svc.end_handle, &chr, &chr_count, c);
+      if (chr_status != ESP_GATT_OK || chr_count == 0) {
+        if (c == 0 && chr_status != ESP_GATT_INVALID_OFFSET &&
+            chr_status != ESP_GATT_NOT_FOUND)
+          ESP_LOGW(TAG, "    (characteristics unavailable, status=%d)", chr_status);
         break;
+      }
       ESP_LOGW(TAG, "    characteristic %s, handle 0x%04x, properties 0x%02x",
                esp32_ble_tracker::ESPBTUUID::from_uuid(chr.uuid).to_str(uuid_buf),
                chr.char_handle, chr.properties);
     }
+    if (c == MAX_ENTRIES)
+      ESP_LOGW(TAG, "    ... truncated after %u characteristics", (unsigned) MAX_ENTRIES);
   }
+  if (s == MAX_ENTRIES)
+    ESP_LOGW(TAG, "  ... truncated after %u services", (unsigned) MAX_ENTRIES);
 }
 
 void HomeWhiz::write_char_(uint16_t char_handle, const uint8_t *data, size_t len,
@@ -170,9 +200,11 @@ void HomeWhiz::gattc_event_handler(esp_gattc_cb_event_t event,
       ESP_LOGI(TAG, "Found AC02 notify=0x%04x, AC01 write=0x%04x", this->notify_handle_,
                this->write_handle_);
       // Subscribe to the state stream (plan §3.2).
-      esp_ble_gattc_register_for_notify(this->parent()->get_gattc_if(),
-                                        this->parent()->get_remote_bda(),
-                                        this->notify_handle_);
+      if (esp_ble_gattc_register_for_notify(this->parent()->get_gattc_if(),
+                                            this->parent()->get_remote_bda(),
+                                            this->notify_handle_) != ESP_OK)
+        ESP_LOGW(TAG, "register_for_notify on 0x%04x could not be sent",
+                 this->notify_handle_);
       break;
     }
     case ESP_GATTC_REG_FOR_NOTIFY_EVT: {

@@ -94,6 +94,9 @@ class HomeWhiz : public ble_client::BLEClientNode, public Component {
   uint16_t notify_handle_{0};
   uint16_t write_handle_{0};
   bool handshaken_{false};
+  // Set once the GATT table has been dumped after a failed AC01/AC02 lookup, so
+  // the reconnect loop doesn't repeat it (see log_gatt_hint_).
+  bool gatt_table_logged_{false};
   // millis() when the BLE link opened (0 = not connected). Used only to report
   // connection lifetime in the DISCONNECT log.
   uint32_t connect_time_ms_{0};
