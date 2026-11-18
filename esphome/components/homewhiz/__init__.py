@@ -38,7 +38,8 @@ CONFIG_SCHEMA = (
         {
             cv.GenerateID(): cv.declare_id(HomeWhiz),
             # Model-specific; the only runtime unknown (plan §3.1 / T-B2).
-            # Discover it once from the ble_client GATT dump or nRF Connect.
+            # If it's wrong, the component logs the appliance's GATT table on
+            # connect; pick the service that lists both AC01 and AC02.
             cv.Required(CONF_SERVICE_UUID): cv.string,
             # Optional hub-level connectivity status entity. Reflects the BLE
             # link (connected + handshaken), so HA can tell "appliance off / out

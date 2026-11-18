@@ -73,12 +73,51 @@ void HomeWhiz::dump_config() {
 }
 
 void HomeWhiz::log_gatt_hint_() {
+  // Tell apart "service_uuid matched nothing" from "service matched, but it
+  // lacks AC01/AC02" — the two need different fixes.
+  bool service_found = this->parent()->get_service(this->service_uuid_) != nullptr;
   ESP_LOGE(TAG,
-           "AC01/AC02 not found under service '%s'. The correct service_uuid is "
-           "the one whose characteristics include both 0xAC01 and 0xAC02 — see "
-           "the 'Service UUID:' / 'Characteristic UUID:' lines that ble_client "
-           "logged for this device above, or scan with nRF Connect (plan §3.1).",
-           this->service_uuid_raw_.c_str());
+           "AC01/AC02 not found under service '%s' (service %s). The correct "
+           "service_uuid is the one whose characteristics include both 0xAC01 "
+           "and 0xAC02 — see the GATT table below.",
+           this->service_uuid_raw_.c_str(),
+           service_found ? "found" : "NOT found");
+  this->log_gatt_table_();
+}
+
+void HomeWhiz::log_gatt_table_() {
+  // Dump the peer's GATT table straight from the ESP-IDF cache (the same source
+  // the ESPHome Bluetooth proxy reads). ESPHome's own service/characteristic
+  // dump is only compiled in at logger level VERBOSE; this one shows at the
+  // default level, which is all a user needs to pick the right service_uuid.
+  // Loops are capped so a misbehaving stack can't spin here forever.
+  static const uint16_t MAX_ENTRIES = 32;
+  auto gattc_if = this->parent()->get_gattc_if();
+  auto conn_id = this->parent()->get_conn_id();
+  char uuid_buf[esp32_ble_tracker::UUID_STR_LEN];
+  ESP_LOGW(TAG, "GATT table of the appliance:");
+  for (uint16_t s = 0; s < MAX_ENTRIES; s++) {
+    esp_gattc_service_elem_t svc;
+    uint16_t svc_count = 1;
+    if (esp_ble_gattc_get_service(gattc_if, conn_id, nullptr, &svc, &svc_count, s) !=
+            ESP_GATT_OK ||
+        svc_count == 0)
+      break;
+    ESP_LOGW(TAG, "  service %s, handles 0x%04x-0x%04x",
+             esp32_ble_tracker::ESPBTUUID::from_uuid(svc.uuid).to_str(uuid_buf),
+             svc.start_handle, svc.end_handle);
+    for (uint16_t c = 0; c < MAX_ENTRIES; c++) {
+      esp_gattc_char_elem_t chr;
+      uint16_t chr_count = 1;
+      if (esp_ble_gattc_get_all_char(gattc_if, conn_id, svc.start_handle, svc.end_handle,
+                                     &chr, &chr_count, c) != ESP_GATT_OK ||
+          chr_count == 0)
+        break;
+      ESP_LOGW(TAG, "    characteristic %s, handle 0x%04x, properties 0x%02x",
+               esp32_ble_tracker::ESPBTUUID::from_uuid(chr.uuid).to_str(uuid_buf),
+               chr.char_handle, chr.properties);
+    }
+  }
 }
 
 void HomeWhiz::write_char_(uint16_t char_handle, const uint8_t *data, size_t len,
@@ -139,6 +178,13 @@ void HomeWhiz::gattc_event_handler(esp_gattc_cb_event_t event,
     case ESP_GATTC_REG_FOR_NOTIFY_EVT: {
       if (param->reg_for_notify.handle != this->notify_handle_)
         break;
+      // Without a working subscription the state stream never reaches us, so
+      // don't handshake (and don't report "connected").
+      if (param->reg_for_notify.status != ESP_GATT_OK) {
+        ESP_LOGW(TAG, "register_for_notify on 0x%04x failed: status=%d",
+                 param->reg_for_notify.handle, param->reg_for_notify.status);
+        break;
+      }
       // Handshake: write 8 bytes to AC01 WITHOUT response. The appliance streams
       // nothing until it receives this (plan §3.2).
       this->write_char_(this->write_handle_, HOMEWHIZ_HANDSHAKE,

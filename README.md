@@ -175,8 +175,16 @@ no edits to `bridge.yaml`.
 The BLE characteristics are the same across all HomeWhiz appliances (notify
 `0xAC02`, write `0xAC01`), but the **service** they live under is model-specific.
 `bridge.yaml` ships with `0000ac00-0000-1000-8000-00805f9b34fb`, confirmed on the
-Beko washer. If yours differs, the `ble_client` GATT dump in the DEBUG logs lists
-every service and its characteristics — pick the one containing `AC01` + `AC02`.
+Beko washer. If yours differs, the component logs `AC01/AC02 not found under
+service ...` on connect, followed by the appliance's GATT table: every service
+with its handle range and characteristics. Pick the service that lists both
+`0xAC01` and `0xAC02`. The table shows at the default `DEBUG` level. ESPHome's
+own GATT dump from `ble_client` only appears at `logger: level: VERBOSE`.
+
+A warning `esp_ble_gattc_get_descr_by_char_handle error, status=10` right after
+connecting is harmless. It means `ble_client` found no notification descriptor
+(CCCD) for `AC02`, so it couldn't enable notifications the standard way. Seen on
+a Beko B3WFR572W. The appliance streams state after the handshake anyway.
 
 ### Connection status
 

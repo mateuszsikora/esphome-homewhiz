@@ -80,6 +80,7 @@ class HomeWhiz : public ble_client::BLEClientNode, public Component {
  protected:
   void handle_frame_(const uint8_t *frame, size_t len);
   void log_gatt_hint_();
+  void log_gatt_table_();
   void write_char_(uint16_t char_handle, const uint8_t *data, size_t len,
                    bool with_response);
 
