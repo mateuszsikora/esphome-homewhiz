@@ -32,6 +32,10 @@ void HomeWhiz::loop() {
 }
 
 void HomeWhiz::dump_config() {
+  // dump_config() also runs when a log viewer subscribes over the API (e.g.
+  // `esphome logs` after an OTA). The logger keeps no history, so re-arm the
+  // GATT table: a viewer that attached after the first failure still gets it.
+  this->gatt_table_logged_ = false;
   ESP_LOGCONFIG(TAG, "HomeWhiz:");
   ESP_LOGCONFIG(TAG, "  Service UUID: %s", this->service_uuid_raw_.c_str());
   ESP_LOGCONFIG(TAG, "  Mapping: %u fields, %u write targets", (unsigned) HW_FIELD_COUNT,
@@ -81,7 +85,7 @@ void HomeWhiz::log_gatt_hint_() {
              "service_uuid '%s' matches no service on the appliance. Use the "
              "service that lists both 0xAC01 and 0xAC02 in the GATT table%s.",
              this->service_uuid_raw_.c_str(),
-             this->gatt_table_logged_ ? " logged at the first failure since boot"
+             this->gatt_table_logged_ ? " logged earlier (reconnect the log viewer to see it again)"
                                       : " below");
   } else {
     ESP_LOGE(TAG,
@@ -89,11 +93,12 @@ void HomeWhiz::log_gatt_hint_() {
              "them under this service, please open an issue with this log; "
              "otherwise use the service that lists both.",
              this->service_uuid_raw_.c_str(),
-             this->gatt_table_logged_ ? " logged at the first failure since boot"
+             this->gatt_table_logged_ ? " logged earlier (reconnect the log viewer to see it again)"
                                       : " below");
   }
   // The appliance drops the link without a handshake and ble_client reconnects
-  // every ~10 s, so dump the table once per boot rather than on every attempt.
+  // every ~10 s, so dump the table once (re-armed by dump_config()) rather than
+  // on every attempt.
   if (!this->gatt_table_logged_) {
     this->log_gatt_table_();
     this->gatt_table_logged_ = true;

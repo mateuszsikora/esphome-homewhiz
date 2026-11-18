@@ -175,9 +175,10 @@ no edits to `bridge.yaml`.
 The BLE characteristics are the same across all HomeWhiz appliances (notify
 `0xAC02`, write `0xAC01`), but the **service** they live under is model-specific.
 `bridge.yaml` ships with `0000ac00-0000-1000-8000-00805f9b34fb`, confirmed on the
-Beko washer. If yours differs, the component logs an error on connect, and on
-the first failure after boot it also logs the appliance's GATT table: every
-service with its handle range and characteristics. Pick the service that lists
+Beko washer. If yours differs, the component logs an error on connect. On the
+first failure after boot, and again on the first failure after a log viewer
+(`esphome logs`, the dashboard's Logs) connects, it also logs the appliance's
+GATT table: every service with its handle range and characteristics. Pick the service that lists
 both `0xAC01` and `0xAC02`. The table prints 16-bit UUIDs as `0xAC00`; in
 `service_uuid` write them without the `0x` (`"AC00"`) or in the full form
 (`"0000ac00-0000-1000-8000-00805f9b34fb"`). The table is logged as warnings, so
