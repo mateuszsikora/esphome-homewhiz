@@ -64,15 +64,15 @@ changes.
 ## How it works
 
 ```
-┌────────────────────┐        ┌──────────────────────────┐        ┌───────────────┐
-│  Provisioning       │  once  │  ESP32 (ESPHome)          │  BLE   │  HomeWhiz      │
-│  (your computer)    │        │  homewhiz component       │◄──────►│  appliance     │
-│                     │        │                           │        └───────────────┘
-│  login → fetch      │        │  handshake, reassemble,   │
-│  config → generate: │  ───▶  │  decode via mapping.h,    │  API   ┌───────────────┐
-│  · mapping.h        │  files │  publish entities         │◄──────►│ Home Assistant│
-│  · entities.yaml    │        │                           │  LAN   └───────────────┘
-└────────────────────┘        └──────────────────────────┘
+┌───────────────────────┐        ┌───────────────────────────┐        ┌──────────────────┐
+│  Provisioning         │  once  │  ESP32 (ESPHome)          │  BLE   │  HomeWhiz        │
+│  (your computer)      │        │  homewhiz component       │<──────>│  appliance       │
+│                       │        │                           │        └──────────────────┘
+│  login -> fetch       │        │  handshake, reassemble,   │
+│  config -> generate:  │  ───>  │  decode via mapping.h,    │  API   ┌──────────────────┐
+│  · mapping.h          │  files │  publish entities         │<──────>│  Home Assistant  │
+│  · entities.yaml      │        │                           │  LAN   └──────────────────┘
+└───────────────────────┘        └───────────────────────────┘
 ```
 
 1. **Provisioning (once, on your computer).** `provisioning/` logs into the
