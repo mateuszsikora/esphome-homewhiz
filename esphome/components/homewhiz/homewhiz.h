@@ -96,7 +96,8 @@ class HomeWhiz : public ble_client::BLEClientNode, public Component {
   bool handshaken_{false};
   // Set once the GATT table has been dumped after a failed AC01/AC02 lookup, so
   // the reconnect loop doesn't repeat it (see log_gatt_hint_). Cleared by
-  // dump_config(), i.e. at boot and whenever a log viewer subscribes.
+  // dump_config(), i.e. at boot and when a log viewer subscribes with
+  // dump_config set (a new `esphome logs` session, not an auto-reconnect).
   bool gatt_table_logged_{false};
   // millis() when the BLE link opened (0 = not connected). Used only to report
   // connection lifetime in the DISCONNECT log.

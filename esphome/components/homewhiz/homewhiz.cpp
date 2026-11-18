@@ -32,9 +32,10 @@ void HomeWhiz::loop() {
 }
 
 void HomeWhiz::dump_config() {
-  // dump_config() also runs when a log viewer subscribes over the API (e.g.
-  // `esphome logs` after an OTA). The logger keeps no history, so re-arm the
-  // GATT table: a viewer that attached after the first failure still gets it.
+  // dump_config() also runs when a log viewer subscribes with dump_config set,
+  // i.e. a new `esphome logs` session or opening Logs (not an automatic
+  // reconnect). The logger keeps no history, so re-arm the GATT table: a viewer
+  // that started after the first failure still gets it.
   this->gatt_table_logged_ = false;
   ESP_LOGCONFIG(TAG, "HomeWhiz:");
   ESP_LOGCONFIG(TAG, "  Service UUID: %s", this->service_uuid_raw_.c_str());
@@ -80,23 +81,24 @@ void HomeWhiz::log_gatt_hint_() {
   // Tell apart "service_uuid matched nothing" from "service matched, but it
   // lacks AC01/AC02" — the two need different fixes.
   bool service_found = this->parent()->get_service(this->service_uuid_) != nullptr;
+  const char *where = this->gatt_table_logged_ ? " logged earlier" : " below";
   // A log client's automatic reconnect doesn't re-run dump_config(), so point
   // at restarting the viewer, not just waiting for it to reconnect.
-  const char *where = this->gatt_table_logged_
-                          ? " logged earlier (restart `esphome logs` or reopen Logs "
-                            "to see it again)"
-                          : " below";
+  const char *again = this->gatt_table_logged_
+                          ? " To see the table again, restart `esphome logs` or "
+                            "reopen Logs."
+                          : "";
   if (!service_found) {
     ESP_LOGE(TAG,
              "service_uuid '%s' matches no service on the appliance. Use the "
-             "service that lists both 0xAC01 and 0xAC02 in the GATT table%s.",
-             this->service_uuid_raw_.c_str(), where);
+             "service that lists both 0xAC01 and 0xAC02 in the GATT table%s.%s",
+             this->service_uuid_raw_.c_str(), where, again);
   } else {
     ESP_LOGE(TAG,
              "AC01/AC02 not found under service '%s'. If the GATT table%s lists "
              "them under this service, please open an issue with this log; "
-             "otherwise use the service that lists both.",
-             this->service_uuid_raw_.c_str(), where);
+             "otherwise use the service that lists both.%s",
+             this->service_uuid_raw_.c_str(), where, again);
   }
   // The appliance drops the link without a handshake and ble_client reconnects
   // every ~10 s, so dump the table once (re-armed by dump_config()) rather than
