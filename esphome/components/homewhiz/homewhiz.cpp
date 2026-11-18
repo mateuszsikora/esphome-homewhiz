@@ -80,21 +80,23 @@ void HomeWhiz::log_gatt_hint_() {
   // Tell apart "service_uuid matched nothing" from "service matched, but it
   // lacks AC01/AC02" — the two need different fixes.
   bool service_found = this->parent()->get_service(this->service_uuid_) != nullptr;
+  // A log client's automatic reconnect doesn't re-run dump_config(), so point
+  // at restarting the viewer, not just waiting for it to reconnect.
+  const char *where = this->gatt_table_logged_
+                          ? " logged earlier (restart `esphome logs` or reopen Logs "
+                            "to see it again)"
+                          : " below";
   if (!service_found) {
     ESP_LOGE(TAG,
              "service_uuid '%s' matches no service on the appliance. Use the "
              "service that lists both 0xAC01 and 0xAC02 in the GATT table%s.",
-             this->service_uuid_raw_.c_str(),
-             this->gatt_table_logged_ ? " logged earlier (reconnect the log viewer to see it again)"
-                                      : " below");
+             this->service_uuid_raw_.c_str(), where);
   } else {
     ESP_LOGE(TAG,
              "AC01/AC02 not found under service '%s'. If the GATT table%s lists "
              "them under this service, please open an issue with this log; "
              "otherwise use the service that lists both.",
-             this->service_uuid_raw_.c_str(),
-             this->gatt_table_logged_ ? " logged earlier (reconnect the log viewer to see it again)"
-                                      : " below");
+             this->service_uuid_raw_.c_str(), where);
   }
   // The appliance drops the link without a handshake and ble_client reconnects
   // every ~10 s, so dump the table once (re-armed by dump_config()) rather than
