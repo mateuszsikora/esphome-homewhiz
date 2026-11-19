@@ -101,7 +101,7 @@ tests/          host-side C++ decode test (no hardware needed)
   external antenna, placed close to the appliance, is recommended. Run **one ESP
   per appliance**: the component decodes against a single generated table, and
   appliances in different rooms are out of one ESP's BLE range anyway.
-- [ESPHome](https://esphome.io) **2026.7.2** (esp-idf framework). See
+- [ESPHome](https://esphome.io) **2026.10.2** (esp-idf framework). See
   [ESPHome version](#esphome-version).
 - [uv](https://github.com/astral-sh/uv) for the provisioning Python project
   (or any Python 3.12 environment).
@@ -291,7 +291,7 @@ button:
 
 ## ESPHome version
 
-Pinned target: **ESPHome 2026.7.2** (esp-idf). `esphome compile bridge.yaml`
+Pinned target: **ESPHome 2026.10.2** (esp-idf). `esphome compile bridge.yaml`
 builds cleanly against it (~60% flash on `esp32dev`), and CI compiles the firmware
 on every push, so a change that breaks the build against this pin is caught before
 merge. CI won't flag a *newer* ESPHome release on its own — bump the pin and let it

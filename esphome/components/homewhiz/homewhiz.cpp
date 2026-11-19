@@ -14,6 +14,13 @@ static const char *const TAG = "homewhiz";
 // (get_gattc_if, get_conn_id, get_remote_bda, get_characteristic, node_state,
 // ESPBTUUID) have drifted across ESPHome releases. Pin the ESPHome version in
 // README; if the build fails, adjust these names — the logic is unchanged.
+//
+// We call esp_ble_gattc_register_for_notify() directly instead of
+// parent()->register_for_notify() (only in ESPHome >= 2026.8). That is safe
+// only because this node never sets node_state = ESTABLISHED, so ble_client
+// keeps the GATT cache until disconnect and the CCCD lookup on
+// REG_FOR_NOTIFY_EVT still works. If you ever set ESTABLISHED (e.g. to free
+// RAM after discovery), switch to parent()->register_for_notify() first.
 // ---------------------------------------------------------------------------
 
 void HomeWhiz::loop() {

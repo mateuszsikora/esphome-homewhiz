@@ -6,7 +6,7 @@
 # Regenerate both with provisioning/ and this same yaml serves any HomeWhiz
 # appliance — no edits here. See README.
 #
-# Pinned ESPHome: 2026.7.2 (esp-idf).
+# Pinned ESPHome: 2026.10.2 (esp-idf).
 
 esphome:
   name: homewhiz-bridge
@@ -78,8 +78,9 @@ esp32_ble_tracker:
     - then:
         - lambda: |-
             if (id(appliance)->is_connected()) return;
+            char addr[esphome::MAC_ADDRESS_PRETTY_BUFFER_SIZE];
             ESP_LOGI("scan", "Nearby BLE  %s  RSSI=%d  name='%s'",
-                     x.address_str().c_str(), x.get_rssi(), x.get_name().c_str());
+                     x.address_str_to(addr), x.get_rssi(), x.get_name().c_str());
 
 ble_client:
   - mac_address: !secret appliance_mac
