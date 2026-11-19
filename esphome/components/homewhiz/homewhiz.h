@@ -23,11 +23,11 @@
 namespace esphome {
 namespace homewhiz {
 
-// 16-bit characteristics, identical across all HomeWhiz appliances (plan §3.1).
+// 16-bit characteristics, identical across all HomeWhiz appliances.
 static const uint16_t HOMEWHIZ_NOTIFY_CHAR = 0xAC02;  // state stream
 static const uint16_t HOMEWHIZ_WRITE_CHAR = 0xAC01;   // handshake + commands
 
-// Handshake (plan §3.2) and command frame prefix (plan §3.6).
+// Handshake and command frame prefix.
 static const uint8_t HOMEWHIZ_HANDSHAKE[8] = {0x02, 0x04, 0x00, 0x04,
                                               0x00, 0x1A, 0x01, 0x03};
 
@@ -71,7 +71,7 @@ class HomeWhiz : public ble_client::BLEClientNode, public Component {
   }
 #endif
 
-  // Stretch goal (plan §3.6 / T-B4): write value V to appliance index I. Guarded
+  // Opt-in write path: write value V to appliance index I. Guarded
   // — only call from an explicit user action.
   void send_command(uint8_t index, uint8_t value);
   // Convenience: write by mapping.h WRITE_* key (e.g. "STATE").

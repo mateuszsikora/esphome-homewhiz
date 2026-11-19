@@ -37,7 +37,7 @@ CONFIG_SCHEMA = (
     cv.Schema(
         {
             cv.GenerateID(): cv.declare_id(HomeWhiz),
-            # Model-specific; the only runtime unknown (plan §3.1 / T-B2).
+            # Model-specific; the only runtime unknown.
             # If it's wrong, the component logs the appliance's GATT table on
             # the first failed connect; pick the service that lists both AC01
             # and AC02.

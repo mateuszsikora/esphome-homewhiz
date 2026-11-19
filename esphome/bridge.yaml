@@ -23,7 +23,7 @@ logger:
   level: DEBUG
 
 api:
-  # Opt-in write path (plan §3.6). Exposes a Home Assistant action to write a raw
+  # Opt-in write path. Exposes a Home Assistant action to write a raw
   # command (index, value) to the appliance. Nothing fires automatically.
   #
   # ⚠️ WRITES CAN PHYSICALLY OPERATE THE APPLIANCE (e.g. start a wash). The
@@ -91,7 +91,7 @@ homewhiz:
     ble_client_id: appliance_ble
     # Confirmed on a live Beko EWUE7636XAW (AC01/AC02 live here). If yours
     # differs, homewhiz logs the GATT table when AC01/AC02 aren't found — pick
-    # the service that lists both (plan §3.1 / T-B2).
+    # the service that lists both.
     service_uuid: "0000ac00-0000-1000-8000-00805f9b34fb"
     # Connectivity status: ON once connected + handshaken to the appliance, OFF
     # when the BLE link is down (appliance powered off, out of range, or the

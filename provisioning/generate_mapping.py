@@ -3,7 +3,7 @@
 
 The generator walks the ``ApplianceConfiguration`` **generically** — it never
 looks up washer field names. Every feature in any section is classified into one
-of four primitive kinds (plan §3.7):
+of four primitive kinds:
 
 * ``ENUM``     — read index + ``{byte -> strKey}`` table
 * ``NUMERIC``  — read index + ``factor`` (value = ``byte * factor``)
@@ -354,7 +354,7 @@ def emit_entities(walker: Walker, hub_id: str = "appliance") -> str:
     numeric/progress -> sensor, enum -> text_sensor, flag -> binary_sensor, with
     Home Assistant semantics attached (device_class / state_class /
     entity_category). Pull into a device-agnostic bridge yaml via `packages`, so
-    any appliance is just "regenerate + include", no hand-wiring (plan §6-T-B3).
+    any appliance is just "regenerate + include", no hand-wiring.
     """
     sensors: list[str] = []
     text_sensors: list[str] = []

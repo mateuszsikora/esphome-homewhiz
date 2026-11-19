@@ -10,7 +10,7 @@ namespace homewhiz {
 static const char *const TAG = "homewhiz";
 
 // ---------------------------------------------------------------------------
-// NOTE (plan §6-T-B5): the ESP-IDF/ESPHome BLE accessor names below
+// NOTE: the ESP-IDF/ESPHome BLE accessor names below
 // (get_gattc_if, get_conn_id, get_remote_bda, get_characteristic, node_state,
 // ESPBTUUID) have drifted across ESPHome releases. Pin the ESPHome version in
 // README; if the build fails, adjust these names — the logic is unchanged.
@@ -200,7 +200,7 @@ void HomeWhiz::gattc_event_handler(esp_gattc_cb_event_t event,
         this->connect_time_ms_ = millis();
       }
       // Request a larger MTU so the ~77-byte state frame arrives in two
-      // fragments rather than many (plan §3.3). ble_client usually negotiates
+      // fragments rather than many. ble_client usually negotiates
       // this already; requesting is idempotent.
       esp_ble_gattc_send_mtu_req(this->parent()->get_gattc_if(),
                                  this->parent()->get_conn_id());
@@ -223,7 +223,7 @@ void HomeWhiz::gattc_event_handler(esp_gattc_cb_event_t event,
       this->write_handle_ = write_chr->handle;
       ESP_LOGI(TAG, "Found AC02 notify=0x%04x, AC01 write=0x%04x", this->notify_handle_,
                this->write_handle_);
-      // Subscribe to the state stream (plan §3.2).
+      // Subscribe to the state stream.
       if (esp_ble_gattc_register_for_notify(this->parent()->get_gattc_if(),
                                             this->parent()->get_remote_bda(),
                                             this->notify_handle_) != ESP_OK) {
@@ -243,7 +243,7 @@ void HomeWhiz::gattc_event_handler(esp_gattc_cb_event_t event,
         break;
       }
       // Handshake: write 8 bytes to AC01 WITHOUT response. The appliance streams
-      // nothing until it receives this (plan §3.2).
+      // nothing until it receives this.
       this->write_char_(this->write_handle_, HOMEWHIZ_HANDSHAKE,
                         sizeof(HOMEWHIZ_HANDSHAKE), /*with_response=*/false);
       this->handshaken_ = true;
@@ -253,7 +253,7 @@ void HomeWhiz::gattc_event_handler(esp_gattc_cb_event_t event,
     case ESP_GATTC_NOTIFY_EVT: {
       if (param->notify.handle != this->notify_handle_)
         break;
-      // Ignore notifications shorter than 10 bytes (plan §3.3).
+      // Ignore notifications shorter than 10 bytes.
       if (param->notify.value_len < 10)
         break;
       size_t out_len = 0;
@@ -356,7 +356,7 @@ void HomeWhiz::send_command(uint8_t index, uint8_t value) {
     ESP_LOGW(TAG, "send_command ignored: not connected/handshaken");
     return;
   }
-  // Command frame (plan §3.6): 02 04 00 04 00 <index> 01 <value>
+  // Command frame: 02 04 00 04 00 <index> 01 <value>
   const uint8_t cmd[8] = {0x02, 0x04, 0x00, 0x04, 0x00, index, 0x01, value};
   this->write_char_(this->write_handle_, cmd, sizeof(cmd), /*with_response=*/false);
   ESP_LOGI(TAG, "send_command index=%u value=%u", index, value);

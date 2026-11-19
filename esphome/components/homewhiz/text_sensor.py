@@ -1,7 +1,7 @@
 """Enum/flag HomeWhiz entities (state, program, warnings, …).
 
 Each text_sensor names a `key` from the generated mapping.h; resolved at runtime
-against the table (plan §6-T-B3).
+against the table.
 """
 
 import esphome.codegen as cg

@@ -2,7 +2,7 @@
 
 Each sensor names a `key` from the generated mapping.h; the C++ resolves it
 against the table at runtime, so the field set can differ per appliance with no
-code changes (plan §6-T-B3).
+code changes.
 """
 
 import esphome.codegen as cg
