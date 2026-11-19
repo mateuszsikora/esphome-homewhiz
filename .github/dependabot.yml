@@ -1,0 +1,21 @@
+# Keeps the GitHub Actions in .github/workflows/ on current majors (e.g. before
+# GitHub drops a Node runtime they're built on). Monthly and grouped, so it's at
+# most one PR a month.
+#
+# ESPHome isn't covered: it's pinned via ESPHOME_VERSION in ci.yml, which
+# Dependabot can't parse, and each bump needs an on-device BLE test anyway.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    # Skip releases younger than a week, so a compromised or broken tag that gets
+    # pulled within days never lands here. Costs nothing at a monthly interval.
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "chore(ci)"

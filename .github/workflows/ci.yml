@@ -4,6 +4,10 @@ on:
   push:
   pull_request:
 
+# Both jobs only read the repo; don't hand GITHUB_TOKEN the repo-default scopes.
+permissions:
+  contents: read
+
 env:
   # The component is pinned to this ESPHome release (see README): its low-level
   # BLE GATT accessors drift across versions. Test against exactly that version.
@@ -13,12 +17,12 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # These jobs only read the repo; don't leave the token in git config.
           persist-credentials: false
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
@@ -68,17 +72,17 @@ jobs:
     # GitHub's 6-hour default.
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # These jobs only read the repo; don't leave the token in git config.
           persist-credentials: false
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
       - name: Cache PlatformIO / esp-idf toolchain
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.platformio
