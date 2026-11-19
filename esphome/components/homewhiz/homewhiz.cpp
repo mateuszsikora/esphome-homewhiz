@@ -53,13 +53,16 @@ void HomeWhiz::dump_config() {
   // binary_sensor<-flag). Mismatches would silently never publish otherwise.
   auto check = [](const char *platform, const std::string &key, bool ok_kind) {
     const FieldDesc *d = hw_find_field(key.c_str());
-    if (d == nullptr)
+    // Keep the braces: below logger level DEBUG, ESP_LOGCONFIG expands to nothing
+    // and a bare `else` would trip -Wempty-body.
+    if (d == nullptr) {
       ESP_LOGE(TAG, "  %s key '%s' not found in mapping.h", platform, key.c_str());
-    else if (!ok_kind)
+    } else if (!ok_kind) {
       ESP_LOGE(TAG, "  %s key '%s' has incompatible kind %u for this platform",
                platform, key.c_str(), (unsigned) d->kind);
-    else
+    } else {
       ESP_LOGCONFIG(TAG, "  %s key: %s", platform, key.c_str());
+    }
   };
 #ifdef USE_SENSOR
   for (auto &e : this->sensors_) {
@@ -136,8 +139,9 @@ void HomeWhiz::log_gatt_table_() {
     auto status =
         esp_ble_gattc_get_service(gattc_if, conn_id, nullptr, &svc, &svc_count, s);
     if (status != ESP_GATT_OK || svc_count == 0) {
-      if (s == 0)
+      if (s == 0) {
         ESP_LOGW(TAG, "  (no services in the ESP-IDF cache, status=%d)", status);
+      }
       break;
     }
     ESP_LOGW(TAG, "  service %s, handles 0x%04x-0x%04x",
@@ -151,19 +155,22 @@ void HomeWhiz::log_gatt_table_() {
           gattc_if, conn_id, svc.start_handle, svc.end_handle, &chr, &chr_count, c);
       if (chr_status != ESP_GATT_OK || chr_count == 0) {
         if (c == 0 && chr_status != ESP_GATT_INVALID_OFFSET &&
-            chr_status != ESP_GATT_NOT_FOUND)
+            chr_status != ESP_GATT_NOT_FOUND) {
           ESP_LOGW(TAG, "    (characteristics unavailable, status=%d)", chr_status);
+        }
         break;
       }
       ESP_LOGW(TAG, "    characteristic %s, handle 0x%04x, properties 0x%02x",
                esp32_ble_tracker::ESPBTUUID::from_uuid(chr.uuid).to_str(uuid_buf),
                chr.char_handle, chr.properties);
     }
-    if (c == MAX_ENTRIES)
+    if (c == MAX_ENTRIES) {
       ESP_LOGW(TAG, "    ... truncated after %u characteristics", (unsigned) MAX_ENTRIES);
+    }
   }
-  if (s == MAX_ENTRIES)
+  if (s == MAX_ENTRIES) {
     ESP_LOGW(TAG, "  ... truncated after %u services", (unsigned) MAX_ENTRIES);
+  }
 }
 
 void HomeWhiz::write_char_(uint16_t char_handle, const uint8_t *data, size_t len,
@@ -173,9 +180,10 @@ void HomeWhiz::write_char_(uint16_t char_handle, const uint8_t *data, size_t len
       len, const_cast<uint8_t *>(data),
       with_response ? ESP_GATT_WRITE_TYPE_RSP : ESP_GATT_WRITE_TYPE_NO_RSP,
       ESP_GATT_AUTH_REQ_NONE);
-  if (status != ESP_OK)
+  if (status != ESP_OK) {
     ESP_LOGW(TAG, "write_char to handle 0x%04x failed, status=%d", char_handle,
              status);
+  }
 }
 
 void HomeWhiz::gattc_event_handler(esp_gattc_cb_event_t event,
@@ -218,9 +226,10 @@ void HomeWhiz::gattc_event_handler(esp_gattc_cb_event_t event,
       // Subscribe to the state stream (plan §3.2).
       if (esp_ble_gattc_register_for_notify(this->parent()->get_gattc_if(),
                                             this->parent()->get_remote_bda(),
-                                            this->notify_handle_) != ESP_OK)
+                                            this->notify_handle_) != ESP_OK) {
         ESP_LOGW(TAG, "register_for_notify on 0x%04x could not be sent",
                  this->notify_handle_);
+      }
       break;
     }
     case ESP_GATTC_REG_FOR_NOTIFY_EVT: {
@@ -251,12 +260,13 @@ void HomeWhiz::gattc_event_handler(esp_gattc_cb_event_t event,
       bool saw_extra_fragment = false;
       const uint8_t *frame = this->accumulator_.feed(
           param->notify.value, param->notify.value_len, out_len, &saw_extra_fragment);
-      if (saw_extra_fragment)
+      if (saw_extra_fragment) {
         ESP_LOGW(TAG,
                  "BLE state frame carries a fragment index >= 2: this appliance's "
                  "frames span more than the two fragments the HomeWhiz protocol "
                  "uses, so they cannot be reassembled and are dropped. Not seen on "
                  "any known appliance — please open an issue with your model.");
+      }
       if (frame != nullptr)
         this->handle_frame_(frame, out_len);
       break;
