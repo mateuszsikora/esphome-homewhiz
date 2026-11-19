@@ -5,7 +5,7 @@
 project (MIT — see `LICENSE.upstream`).
 
 - Source path: `custom_components/homewhiz/{api.py,appliance_config.py}`
-- Copied from commit: `f0b7494b0ee307c5c39a71560eaca841cd18d4a3` (2026-06-30)
+- Copied from commit: `225186711b1779939fdd15e6f57f53cf46d0c719` (2026-11-19)
 
 ## Updating
 

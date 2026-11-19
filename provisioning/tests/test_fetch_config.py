@@ -7,6 +7,9 @@ must never silently assume a washer (plan §5/T-A2).
 
 from __future__ import annotations
 
+import argparse
+import asyncio
+
 import pytest
 
 import fetch_config
@@ -92,3 +95,37 @@ def test_resolve_credentials_non_interactive_exits(monkeypatch):
     monkeypatch.setattr(fetch_config, "_interactive", lambda: False)
     with pytest.raises(SystemExit):
         fetch_config._resolve_credentials("")
+
+
+def test_missing_configuration_exits_cleanly(monkeypatch):
+    # HomeWhiz can list an appliance but have no CONFIGURATION content for it;
+    # that must be a clear exit, not a traceback.
+    monkeypatch.setattr(fetch_config, "find_dotenv", lambda **_: "")
+    monkeypatch.setattr(fetch_config, "_interactive", lambda: False)
+    monkeypatch.setenv("HOMEWHIZ_USER", "u@e.co")
+    monkeypatch.setenv("HOMEWHIZ_PASS", "pw")
+
+    async def login(*_):
+        return object()
+
+    async def fetch_infos(*_):
+        return [WASHER]
+
+    async def fetch_contents(*_, **__):
+        raise api.NoConfigurationError(WASHER.applianceId)
+
+    monkeypatch.setattr(api, "login", login)
+    monkeypatch.setattr(api, "fetch_appliance_infos", fetch_infos)
+    monkeypatch.setattr(api, "fetch_appliance_contents", fetch_contents)
+
+    args = argparse.Namespace(
+        model=None,
+        appliance_id=None,
+        language=None,
+        out="unused.h",
+        entities_out="unused.yaml",
+        dump_config=None,
+        dump_localization=None,
+    )
+    with pytest.raises(SystemExit, match="no CONFIGURATION for EWUE7636XAW"):
+        asyncio.run(fetch_config._run(args))

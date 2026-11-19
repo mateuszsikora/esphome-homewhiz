@@ -198,6 +198,12 @@ async def _run(args: argparse.Namespace) -> None:
         contents = await api.fetch_appliance_contents(
             credentials, target.applianceId, language=language
         )
+    except api.NoConfigurationError:
+        sys.exit(
+            f"HomeWhiz has no CONFIGURATION for {target.model} "
+            f"(applianceId={target.applianceId}), so there's nothing to "
+            f"generate a mapping from."
+        )
     except api.RequestError as e:
         sys.exit(f"Failed to fetch appliance config: {e}")
 
