@@ -252,16 +252,15 @@ delete the `manual_ip:` block from `bridge.yaml` and use DHCP.
 ### Writing to the appliance (advanced, opt-in)
 
 The bridge does not write to the appliance unless you explicitly call the
-`send_command(index, value)` Home Assistant action that ships in `bridge.yaml`
-(plan §3.6). The action is present out of the box but **never fires on its own** —
-you invoke it deliberately. Remove the `actions:` block from `bridge.yaml` to make
-the bridge strictly read-only.
+`send_command(index, value)` Home Assistant action that ships in `bridge.yaml`.
+The action is present out of the box but **never fires on its own** — you invoke
+it deliberately. Remove the `actions:` block from `bridge.yaml` to make the bridge
+strictly read-only.
 
 > ⚠️ **Writes can physically operate the appliance** (e.g. start a wash cycle).
 > The command values are **appliance-specific and not validated by this project**.
 > Test with care, and never enable this where an unattended start could cause
-> harm or flooding. Remove the `actions:` block from `bridge.yaml` to make the
-> bridge strictly read-only.
+> harm or flooding.
 
 The writable target is the **device-state index** (`STATE`, index 34 on the
 washer — `program.wfaWriteIndex` is null in every known config, so you cannot set
@@ -336,10 +335,11 @@ bash tests/run.sh
 The decode core (`esphome/components/homewhiz/decode.h`) is deliberately free of
 any ESPHome/ESP-IDF dependency so it can be unit-tested on the host.
 
-CI runs both of the above and then `esphome config` against **every** fixture in
+CI runs both of the above, then `esphome config` against **every** fixture in
 `provisioning/tests/fixtures/` (washer/dryer/dishwasher/oven), so a generator
 change that breaks an appliance shape the washer doesn't exercise is caught
-without hardware.
+without hardware. A separate job, run in parallel, compiles the firmware for
+the washer fixture.
 
 ## Security
 
