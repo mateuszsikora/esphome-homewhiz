@@ -1,7 +1,10 @@
 name: CI
 
 on:
+  # Feature branches are tested through their PR; a bare `push:` would run every
+  # PR twice. master still gets a run of its own after each merge.
   push:
+    branches: [master]
   pull_request:
 
 # Both jobs only read the repo; don't hand GITHUB_TOKEN the repo-default scopes.
