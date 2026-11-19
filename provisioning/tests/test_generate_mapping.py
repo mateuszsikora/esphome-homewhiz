@@ -128,3 +128,37 @@ def test_washer_entities_classification():
 def test_other_types_emit_entities(fixture):
     y = _entities(fixture)
     assert y.count("platform: homewhiz") > 0
+
+
+def test_enum_option_without_value_is_skipped(tmp_path):
+    # Upstream made wifiArrayValue optional (sparse refrigerator configs). An
+    # option with no wire value can't be decoded, so it must be dropped rather
+    # than emitted as `{None, ...}`.
+    with open(FIXTURES / "example_washing_machine_config.json", encoding="utf-8") as f:
+        config = json.load(f)
+    states = config["deviceStates"]["states"]
+    assert states[0]["strKey"] == "DEVICE_STATE_ON"
+    del states[0]["wifiArrayValue"]
+
+    header = gm.generate(config, {})
+    assert '"DEVICE_STATE_ON"' not in header
+    assert '"DEVICE_STATE_OFF"' in header
+    assert "None" not in header
+    if CXX is not None:
+        ok, err = _compiles(header, tmp_path)
+        assert ok, err
+
+
+def test_enum_with_no_valued_options_is_dropped(capsys):
+    # If *every* option lacks a wifiArrayValue there's nothing to decode or
+    # write: drop the field (and its write slot) rather than emit an empty table.
+    with open(FIXTURES / "example_washing_machine_config.json", encoding="utf-8") as f:
+        config = json.load(f)
+    for state in config["deviceStates"]["states"]:
+        del state["wifiArrayValue"]
+
+    header = gm.generate(config, {})
+    assert "HW_ENUM_STATE[]" not in header
+    # _field_line matches any `{"STATE", ...` row: HW_FIELDS and HW_WRITES alike
+    assert _field_line(header, "STATE") is None
+    assert "warning: enum 'STATE' has no decodable options" in capsys.readouterr().err

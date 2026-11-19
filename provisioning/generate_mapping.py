@@ -26,6 +26,7 @@ from dacite import Config, from_dict
 from vendor.appliance_config import (
     ApplianceConfiguration,
     ApplianceFeature,
+    ApplianceFeatureEnumOption,
     ApplianceProgress,
     ApplianceState,
     ApplianceSubState,
@@ -42,6 +43,16 @@ KIND_FLAG = 3
 class EnumEntry:
     value: int
     key: str
+
+
+def _enums(options: list[ApplianceFeatureEnumOption]) -> list[EnumEntry]:
+    # Some configs (e.g. refrigerators) carry options with no wifiArrayValue.
+    # They have no byte on the wire to decode, so skip them, as upstream does.
+    return [
+        EnumEntry(o.wifiArrayValue, o.strKey)
+        for o in options
+        if o.wifiArrayValue is not None
+    ]
 
 
 @dataclass
@@ -89,6 +100,19 @@ class Walker:
         f.label = self._label(f.key)
         self.fields.append(f)
 
+    def _no_values(self, key: str, enums: list[EnumEntry]) -> bool:
+        # No option has a wifiArrayValue (or the list was empty to begin with):
+        # nothing to decode or write, and emitting it would mean a zero-length
+        # C array. Drop the field instead. It never reaches _add, so it doesn't
+        # claim the key: a later section defining the same strKey still wins.
+        if enums:
+            return False
+        print(
+            f"warning: enum {key!r} has no decodable options — skipping it",
+            file=sys.stderr,
+        )
+        return True
+
     def _add_write(self, key: str, index: int | None) -> None:
         if index is None or key in self._seen_writes:
             return
@@ -100,20 +124,26 @@ class Walker:
     def add_state(self, key: str, state: ApplianceState) -> None:
         if state is None or state.wifiArrayReadIndex is None:
             return
-        enums = [EnumEntry(o.wifiArrayValue, o.strKey) for o in state.states]
+        enums = _enums(state.states)
+        if self._no_values(key, enums):
+            return
         self._add(Field(key, KIND_ENUM, state.wifiArrayReadIndex, enums=enums))
         self._add_write(key, state.wifiArrayWriteIndex)
 
     def add_substate(self, key: str, sub: ApplianceSubState) -> None:
         if sub is None:
             return
-        enums = [EnumEntry(o.wifiArrayValue, o.strKey) for o in sub.subStates]
+        enums = _enums(sub.subStates)
+        if self._no_values(key, enums):
+            return
         self._add(Field(key, KIND_ENUM, sub.wifiArrayReadIndex, enums=enums, diagnostic=True))
 
     def add_program(self, program) -> None:  # ApplianceProgram
         if program is None:
             return
-        enums = [EnumEntry(o.wifiArrayValue, o.strKey) for o in program.values]
+        enums = _enums(program.values)
+        if self._no_values(program.strKey, enums):
+            return
         self._add(Field(program.strKey, KIND_ENUM, program.wifiArrayIndex, enums=enums))
         self._add_write(program.strKey, program.wfaWriteIndex)
 
@@ -124,7 +154,9 @@ class Walker:
             if feat.strKey is None:
                 continue
             if feat.enumValues:
-                enums = [EnumEntry(o.wifiArrayValue, o.strKey) for o in feat.enumValues]
+                enums = _enums(feat.enumValues)
+                if self._no_values(feat.strKey, enums):
+                    continue
                 self._add(
                     Field(
                         feat.strKey, KIND_ENUM, feat.wifiArrayIndex,
