@@ -4,7 +4,7 @@
 // on the host (see tests/test_decode.cpp). It is driven entirely by the
 // generated mapping.h — there are NO appliance field names or numeric offsets
 // here. Adding a new appliance means regenerating mapping.h, never editing this
-// file. See plan §3.7 / §6-T-B1.
+// file.
 #pragma once
 
 #include <cstddef>
@@ -17,7 +17,7 @@
 namespace esphome {
 namespace homewhiz {
 
-// §3.4 decode rule: every value byte carries a flag in its high bit.
+// Decode rule: every value byte carries a flag in its high bit.
 inline uint8_t hw_value(const uint8_t *data, size_t len, uint8_t index) {
   // Bounds-checked like upstream safe_get(): out of range -> 0.
   if (index >= len) return 0;
@@ -100,7 +100,7 @@ inline const WriteDesc *hw_find_write(const char *key) {
   return nullptr;
 }
 
-// §3.3 fragment reassembly. State arrives as two BLE notifications, each with a
+// Fragment reassembly. State arrives as two BLE notifications, each with a
 // 7-byte header; byte 4 is the fragment index. Faithful port of upstream
 // MessageAccumulator. Notifications shorter than 10 bytes are ignored by the
 // caller before reaching here.

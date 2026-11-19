@@ -1,8 +1,8 @@
 // Host-side unit test for the table-driven decode core + fragment reassembly.
 //
 // Runs without ESPHome or hardware. It generates the washer mapping.h from the
-// upstream fixture (see tests/run.sh), includes it via decode.h, and decodes the
-// verified reference frame from plan §3.5.
+// upstream fixture (see tests/run.sh), includes it via decode.h, and decodes a
+// verified reference frame.
 //
 // Build/run: tests/run.sh
 #include <cstdio>
@@ -34,7 +34,7 @@ static std::vector<uint8_t> from_hex(const std::string &hex) {
   return out;
 }
 
-// Verified reference frame (§3.5): state=on, cottons, 30 C, 137 min remaining.
+// Verified reference frame: state=on, cottons, 30 C, 137 min remaining.
 static const char *FRAME_HEX =
     "002f4a45a10100000000000000000000000000000000000000000200000000000000000a011e0c"
     "0000000080021102110000000000000000000000000000000100000000000001070000000000";
@@ -83,7 +83,7 @@ int main() {
             std::strcmp(v.text, "12") == 0,
         "WASHER_SPIN(12) falls back to raw value \"12\"");
 
-  // --- fragment reassembly (§3.3): split the frame into two notifications with
+  // --- fragment reassembly: split the frame into two notifications with
   // 7-byte headers (byte 4 = fragment index) and confirm it reassembles. ---
   MessageAccumulator acc;
   size_t out_len = 0;

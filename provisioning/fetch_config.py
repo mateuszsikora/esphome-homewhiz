@@ -40,7 +40,7 @@ DEFAULT_MAPPING_OUT = "../esphome/components/homewhiz/mapping.h"
 DEFAULT_ENTITIES_OUT = "../esphome/homewhiz_entities.yaml"
 
 # Human-readable appliance types (from upstream homewhiz.py) — display only,
-# never used to filter. See plan §4.
+# never used to filter.
 APPLIANCE_TYPES: dict[int, str] = {
     1: "WASHER",
     2: "REFRIGERATOR",
@@ -69,7 +69,7 @@ def _select(
     model: str | None,
     appliance_id: str | None,
 ) -> api.ApplianceInfo:
-    """Pick one appliance. No implicit washer preference — see plan §5/T-A2."""
+    """Pick one appliance. No implicit washer preference."""
     if appliance_id is not None:
         matches = [a for a in appliances if a.applianceId == appliance_id]
         if not matches:

@@ -2,7 +2,7 @@
 
 The network calls (login/fetch) need real credentials, so we test the pure
 selection logic — the part that decides *which* appliance to provision — which
-must never silently assume a washer (plan §5/T-A2).
+must never silently assume a washer.
 """
 
 from __future__ import annotations

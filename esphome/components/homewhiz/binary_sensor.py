@@ -1,7 +1,7 @@
 """Flag/warning HomeWhiz entities (door open, no water, safety, …).
 
 Each binary_sensor names a `key` from the generated mapping.h whose field is a
-bit flag; resolved at runtime against the table (plan §6-T-B3).
+bit flag; resolved at runtime against the table.
 """
 
 import esphome.codegen as cg

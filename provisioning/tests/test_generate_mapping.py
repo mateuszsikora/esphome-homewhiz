@@ -59,11 +59,12 @@ def test_washer_has_verified_offsets():
     assert program is not None, "washer must expose a program field"
     assert ", 36," in program, f"program must be @ index 36: {program}"
 
-    # progress pairs (hour, minute) — verified in plan §3.5
+    # progress pairs (hour, minute), as in the reference frame in tests/test_decode.cpp
     remaining = _field_line(header, "WASHER_REMAINING")
     assert remaining is not None and "KIND_PROGRESS, 46, 47," in remaining
 
-    # writable state target (start/pause), not program — see write-path finding
+    # writable state target (start/pause), not program: program.wfaWriteIndex is
+    # null in every known config (see "Writing to the appliance" in the README)
     assert re.search(r'^\s*\{"STATE", 34\},', header, re.MULTILINE), \
         "washer must expose STATE write target @ index 34"
 
