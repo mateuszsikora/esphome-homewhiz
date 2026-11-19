@@ -63,7 +63,8 @@ def test_washer_has_verified_offsets():
     remaining = _field_line(header, "WASHER_REMAINING")
     assert remaining is not None and "KIND_PROGRESS, 46, 47," in remaining
 
-    # writable state target (start/pause), not program — see write-path finding
+    # writable state target (start/pause), not program: program.wfaWriteIndex is
+    # null in every known config (see "Writing to the appliance" in the README)
     assert re.search(r'^\s*\{"STATE", 34\},', header, re.MULTILINE), \
         "washer must expose STATE write target @ index 34"
 

@@ -10,10 +10,10 @@ namespace homewhiz {
 static const char *const TAG = "homewhiz";
 
 // ---------------------------------------------------------------------------
-// NOTE: the ESP-IDF/ESPHome BLE accessor names below
-// (get_gattc_if, get_conn_id, get_remote_bda, get_characteristic, node_state,
-// ESPBTUUID) have drifted across ESPHome releases. Pin the ESPHome version in
-// README; if the build fails, adjust these names — the logic is unchanged.
+// NOTE: the ESP-IDF/ESPHome BLE accessor names below (get_gattc_if, get_conn_id,
+// get_remote_bda, get_characteristic, node_state, ESPBTUUID) have drifted across
+// ESPHome releases. Pin the ESPHome version in README; if the build fails,
+// adjust these names — the logic is unchanged.
 //
 // We call esp_ble_gattc_register_for_notify() directly instead of
 // parent()->register_for_notify() (only in ESPHome >= 2026.8). That is safe
@@ -200,8 +200,8 @@ void HomeWhiz::gattc_event_handler(esp_gattc_cb_event_t event,
         this->connect_time_ms_ = millis();
       }
       // Request a larger MTU so the ~77-byte state frame arrives in two
-      // fragments rather than many. ble_client usually negotiates
-      // this already; requesting is idempotent.
+      // fragments rather than many. ble_client usually negotiates this already;
+      // requesting is idempotent.
       esp_ble_gattc_send_mtu_req(this->parent()->get_gattc_if(),
                                  this->parent()->get_conn_id());
       this->handshaken_ = false;

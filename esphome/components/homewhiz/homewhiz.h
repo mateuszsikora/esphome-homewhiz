@@ -27,7 +27,7 @@ namespace homewhiz {
 static const uint16_t HOMEWHIZ_NOTIFY_CHAR = 0xAC02;  // state stream
 static const uint16_t HOMEWHIZ_WRITE_CHAR = 0xAC01;   // handshake + commands
 
-// Handshake and command frame prefix.
+// Handshake. Same frame layout as send_command: 02 04 00 04 00 <index> 01 <value>.
 static const uint8_t HOMEWHIZ_HANDSHAKE[8] = {0x02, 0x04, 0x00, 0x04,
                                               0x00, 0x1A, 0x01, 0x03};
 
@@ -71,8 +71,8 @@ class HomeWhiz : public ble_client::BLEClientNode, public Component {
   }
 #endif
 
-  // Opt-in write path: write value V to appliance index I. Guarded
-  // — only call from an explicit user action.
+  // Opt-in write path: write value V to appliance index I. Guarded — only call
+  // from an explicit user action.
   void send_command(uint8_t index, uint8_t value);
   // Convenience: write by mapping.h WRITE_* key (e.g. "STATE").
   bool send_command_key(const std::string &key, uint8_t value);

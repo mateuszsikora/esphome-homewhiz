@@ -23,8 +23,8 @@ logger:
   level: DEBUG
 
 api:
-  # Opt-in write path. Exposes a Home Assistant action to write a raw
-  # command (index, value) to the appliance. Nothing fires automatically.
+  # Opt-in write path. Exposes a Home Assistant action to write a raw command
+  # (index, value) to the appliance. Nothing fires automatically.
   #
   # ⚠️ WRITES CAN PHYSICALLY OPERATE THE APPLIANCE (e.g. start a wash). The
   # command values are appliance-specific and NOT validated by this project — see
